@@ -1,0 +1,8 @@
+for f in *.pdb; do superpose $f $1 S_$f; done
+touch pymol.pml
+for f in S*.pdb
+do
+	echo "load $PWD/$f" >> pymol.pml
+done
+echo "hide all" >> pymol.pml
+echo "show cartoon" >> pymol.pml
