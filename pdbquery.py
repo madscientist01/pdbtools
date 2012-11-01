@@ -54,6 +54,7 @@ def generateQuery(parsing_results) :
 	"""
 
 	homologReductionQuery="""
+
 				<orgPdbQuery>
 					<queryType>org.pdb.query.simple.HomologueReductionQuery</queryType>
 				    <identityCutoff>{0}</identityCutoff>
@@ -77,14 +78,19 @@ def generateQuery(parsing_results) :
 	"""
 
 	molecularWeightQuery = """
-		<orgPdbQuery>
+				<orgPdbQuery>
 					<queryType>org.pdb.query.simple.MolecularWeightQuery</queryType>
 					<mvStructure.structureMolecularWeight.min>{0}</mvStructure.structureMolecularWeight.min>
     				<mvStructure.structureMolecularWeight.max>{1}</mvStructure.structureMolecularWeight.max>
 					<searchTool>blast</searchTool>
 				</orgPdbQuery>
 	"""
-
+	techniqueQuery = """
+				<orgPdbQuery>
+					<queryType>org.pdb.query.simple.ExpTypeQuery</queryType>
+				    <mvStructure.expMethod.value>{0}</mvStructure.expMethod.value>
+				</orgPdbQuery>
+	"""
 
 	queryHead="""
 <?xml version="1.0" encoding="UTF-8"?>
@@ -120,6 +126,12 @@ def generateQuery(parsing_results) :
 	if results.pfamID:
 		query = query+queryRefinementHead.format(refinementLevel)+pfamIDQuery.format(results.pfamID)+queryRefinementEnd
 		refinementLevel+=1
+	techlist = ['X-RAY','SOLUTION NMR', 'SOLID-STATE NMR', 'ELECTRON MICROSCOPY', 'ELECTRON CRYSTALLOGRAPHY', 'FIBER DIFFRACTION',
+				'NEUTRON DIFFRACTION', 'SOLUTION SCATTERING', 'OTHER', 'HYBRID' ]
+	if results.technique and results.technique in techlist:
+		query = query+queryRefinementHead.format(refinementLevel)+techniqueQuery.format(results.technique)+queryRefinementEnd
+		refinementLevel+=1
+			
 	if results.molecularWeight:
 		if re.match("\d+-\d+",results.molecularWeight):
 			(low,high) = results.molecularWeight.split('-')
@@ -221,8 +233,8 @@ if __name__ == "__main__":
 	                    help='molecular weight range: min-max Dalton (example : "20000-40000")')
 
 	parser.add_argument('-t', action='store', dest='technique',
-	                    help='technique')
-	parser.add_argument('-i', action='store', dest='homologyReduction',
+	                    help='technique in X-RAY,SOLUTION NMR,SOLID-STATE NMR,ELECTRON MICROSCOPY,ELECTRON CRYSTALLOGRAPHY,FIBER DIFFRACTION,NEUTRON DIFFRACTION,SOLUTION SCATTERING,OTHER,HYBRID')
+	parser.add_argument('-i', action='store', dest='homologyReduction',default=90,
 	                    help='Reduce Homolog (Exclude identity)')
 	parser.add_argument('-p', action='store', dest='pfamID',
 	                    help='search based on Pfam ID')

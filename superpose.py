@@ -32,7 +32,7 @@ def pdbparsing(filename, regex):
 
 
 
-def htmlout(queryid, queryDescription, subjectDescriptions,rmsd,filename):
+def htmlout(queryid, queryDescription, subjectDescriptions,rmsd,qscore,align,filename):
 #
 # Generate render.html which display rendered png files
 #
@@ -53,7 +53,34 @@ def htmlout(queryid, queryDescription, subjectDescriptions,rmsd,filename):
 		<p><a href="http://www.rcsb.org/pdb/explore/explore.do?structureId={1}">{1}:{2}</a></p>
 		<p><a href="http://www.rcsb.org/pdb/explore/explore.do?structureId={3}">{3}:{4}</a></p>
 		<p>RMSD: {5} Angstrom</p>
+		<p>Q Score: {6}</p>
+		<p>Aligned: {7}</p>
 """
+
+	tableHeader = """
+		<table>
+		<tr>
+			<td> PDB Reference id </td>
+			<td> Reference </td>
+			<td> PDB Query id </td>
+			<td> Query </td>
+			<td> RMSD (A) </td>
+			<td> Q Score (0-1) </td>
+			<td> Aligned AA (#) </td>
+		</tr>
+"""
+	tableContent = """
+		<tr>
+			<td> <a href="http://www.rcsb.org/pdb/explore/explore.do?structureId={0}">{0} </td>
+			<td> {1} </td>
+			<td> <a href="http://www.rcsb.org/pdb/explore/explore.do?structureId={2}">{2} </td>
+			<td> {3} </td>
+			<td> {4} </td>
+			<td> {5} </td>
+			<td> {6} </td>
+		</tr>
+"""
+
 
 	htmlfooter = """
 	</body>
@@ -61,13 +88,16 @@ def htmlout(queryid, queryDescription, subjectDescriptions,rmsd,filename):
 """
 	htmloutput = open(filename,'w')
 	htmloutput.write(htmlheader)
+	table = tableHeader
 	for pdb,desc in subjectDescriptions.items():
 
 		match = re.match("(\S+)_(\S+).pdb",pdb)
 		if match:
 			query = match.group(1)
 			subject = match.group(2)
-		htmloutput.write(imgtag.format(pdb[:-4]+".png", query,queryDescription,subject,desc,rmsd[pdb]))
+		htmloutput.write(imgtag.format(pdb[:-4]+".png", query,queryDescription,subject,desc,rmsd[pdb],qscore[pdb],align[pdb]))
+		table = table+tableContent.format(query,queryDescription,subject,desc,rmsd[pdb],qscore[pdb],align[pdb])
+	htmloutput.write(table+"</table>\n")
 	htmloutput.write(htmlfooter)
 	htmloutput.close()
 
@@ -118,14 +148,24 @@ def main(argument):
 								RMSDDic[superposedFilename] = RMSD
 								QDic[superposedFilename] = Q
 								alignedDic[superposedFilename] = aligned	
+							else:
+								RMSD= 99
+								Q=0
+								aligned=0
+								RMSDDic[superposedFilename] = RMSD
+								QDic[superposedFilename] = Q
+								alignedDic[superposedFilename] = aligned
+								superposedFilename = ''
 							match2 = regex2.search(p_stdout)
 							if match2:
 								matrix=[[float(match2.group(1)),float(match2.group(2)),float(match2.group(3))],
 										[float(match2.group(5)),float(match2.group(6)),float(match2.group(7))],
 										[float(match2.group(9)),float(match2.group(10)),float(match2.group(11))]]
 								vector=[float(match2.group(4)),float(match2.group(5)),float(match2.group(6))]
+							
 							informationFile.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\n".format(pdb, onePdb, superposedFilename,RMSD,Q,aligned))
-							pdbLoadList.append(superposedFilename)
+							if match:
+								pdbLoadList.append(superposedFilename)
 				
 				informationFile.close() 
 				pymolloadingFile.write("bg_color white\n")
@@ -134,6 +174,7 @@ def main(argument):
 				subjectDescriptions={}
 				for singlepdb in pdbLoadList:
 					write = True
+					subjectDescriptions[singlepdb]=pdbparsing(singlepdb, '^TITLE    [ \d](.*)$')
 					if (argument.score and (QDic[singlepdb]>=float(argument.score))):
 						print "{0} is skipped. Q Score:{1}".format(singlepdb, RMSDDic[singlepdb])
 						write = False	
@@ -148,8 +189,7 @@ def main(argument):
 
 					if write:
 
-						if argument.stepwise:
-							subjectDescriptions[singlepdb]=pdbparsing(singlepdb, '^TITLE    [ \d](.*)$')
+						if argument.stepwise:							
 							pymolloadingFile.write("load {0}/{1}\n".format(os.getcwd(),singlepdb))
 							pymolloadingFile.write("hide all\n")			
 							pymolloadingFile.write("show cartoon, {0}\n".format(singlepdb[:-4]))
@@ -170,7 +210,7 @@ def main(argument):
 										  stdout=subprocess.PIPE)
 					p_stdout = p.stdout.read()
 				if argument.stepwise:
-					htmlout(pdb,pdbparsing(pdb, '^TITLE    [ \d](.*)$'),subjectDescriptions,RMSDDic,pdb+'.html')
+					htmlout(pdb,pdbparsing(pdb, '^TITLE    [ \d](.*)$'),subjectDescriptions,RMSDDic,QDic,alignedDic,pdb+'.html')
 
 		sys.exit()		
 
