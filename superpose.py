@@ -32,7 +32,7 @@ def pdbparsing(filename, regex):
 
 
 
-def htmlout(queryid, queryDescription, subjectDescriptions,rmsd,qscore,align,filename):
+def htmlout(queryid, queryDescription, renderingSubjectDescriptions,tableSubjectDescriptions,rmsd,qscore,align,filename):
 #
 # Generate render.html which display rendered png files
 #
@@ -45,6 +45,17 @@ def htmlout(queryid, queryDescription, subjectDescriptions,rmsd,qscore,align,fil
  		<meta charset='utf-8'>
 	</head>
 	<style>
+		table{
+			    font-family: "Lucida Sans Unicode", "Lucida Grande", Sans-Serif;
+			    font-size: 12px;
+			    #margin: 45px;
+			    width:100%;
+			    text-align: left;
+			    border-collapse: collapse;  
+				}
+			tr:nth-child(odd) {
+				background-color: #999999;
+			}
 	</style>
 	<body>
 """
@@ -60,13 +71,13 @@ def htmlout(queryid, queryDescription, subjectDescriptions,rmsd,qscore,align,fil
 	tableHeader = """
 		<table>
 		<tr>
-			<td> PDB Reference id </td>
-			<td> Reference </td>
-			<td> PDB Query id </td>
-			<td> Query </td>
-			<td> RMSD (A) </td>
-			<td> Q Score (0-1) </td>
-			<td> Aligned AA (#) </td>
+			<td>PDB Reference id </td>
+			<td>Reference </td>
+			<td>PDB Query id </td>
+			<td>Query </td>
+			<td>RMSD (A) </td>
+			<td>Q Score (0-1) </td>
+			<td>Aligned AA (#) </td>
 		</tr>
 """
 	tableContent = """
@@ -89,14 +100,23 @@ def htmlout(queryid, queryDescription, subjectDescriptions,rmsd,qscore,align,fil
 	htmloutput = open(filename,'w')
 	htmloutput.write(htmlheader)
 	table = tableHeader
-	for pdb,desc in subjectDescriptions.items():
+	for pdb,desc in renderingSubjectDescriptions.items():
 
 		match = re.match("(\S+)_(\S+).pdb",pdb)
 		if match:
 			query = match.group(1)
 			subject = match.group(2)
 		htmloutput.write(imgtag.format(pdb[:-4]+".png", query,queryDescription,subject,desc,rmsd[pdb],qscore[pdb],align[pdb]))
-		table = table+tableContent.format(query,queryDescription,subject,desc,rmsd[pdb],qscore[pdb],align[pdb])
+
+	for pdb,desc in tableSubjectDescriptions.items():
+		match = re.match("(\S+)_(\S+).pdb",pdb)
+		if match:
+			query = match.group(1)
+			subject = match.group(2)
+		if desc == 'Alignment Failed':
+			table = table+tableContent.format(query,queryDescription,subject,desc,'None','None','None')
+		else:
+			table = table+tableContent.format(query,queryDescription,subject,desc,rmsd[pdb],qscore[pdb],align[pdb])
 	htmloutput.write(table+"</table>\n")
 	htmloutput.write(htmlfooter)
 	htmloutput.close()
@@ -118,7 +138,17 @@ def main(argument):
 				
 				informationFile = open(pdb+'.txt','w')
 				pymolloadingFile = open(pdb+'.pml','w')
+				if argument.view:
+					if os.path.exists(argument.view):
+						f = open(argument.view)
+						view = f.readlines()
+						if re.match("^set_view",view[0]):
+							for line in view:
+								pymolloadingFile.write(line)
+						f.close()
+
 				if len(subjectList)>0:
+					tableSubjectDescriptions = {}
 					for onePdb in subjectList:
 						if (onePdb != pdb) :
 							print "Processing {0}".format(onePdb)
@@ -147,7 +177,8 @@ def main(argument):
 								aligned=float(match.group(3))
 								RMSDDic[superposedFilename] = RMSD
 								QDic[superposedFilename] = Q
-								alignedDic[superposedFilename] = aligned	
+								alignedDic[superposedFilename] = aligned
+								tableSubjectDescriptions[superposedFilename]=pdbparsing(superposedFilename, '^TITLE    [ \d](.*)$')		
 							else:
 								RMSD= 99
 								Q=0
@@ -155,7 +186,9 @@ def main(argument):
 								RMSDDic[superposedFilename] = RMSD
 								QDic[superposedFilename] = Q
 								alignedDic[superposedFilename] = aligned
-								superposedFilename = ''
+								tableSubjectDescriptions[superposedFilename]='Alignment Failed'
+								
+							tablelist = {}
 							match2 = regex2.search(p_stdout)
 							if match2:
 								matrix=[[float(match2.group(1)),float(match2.group(2)),float(match2.group(3))],
@@ -171,10 +204,11 @@ def main(argument):
 				pymolloadingFile.write("bg_color white\n")
 				pymolloadingFile.write("hide all\n")
 				pymolloadingFile.write("load {0}/{1}\n".format(os.getcwd(),pdb))
-				subjectDescriptions={}
+				renderingSubjectDescriptions={}
+
 				for singlepdb in pdbLoadList:
 					write = True
-					subjectDescriptions[singlepdb]=pdbparsing(singlepdb, '^TITLE    [ \d](.*)$')
+					
 					if (argument.score and (QDic[singlepdb]>=float(argument.score))):
 						print "{0} is skipped. Q Score:{1}".format(singlepdb, RMSDDic[singlepdb])
 						write = False	
@@ -189,12 +223,16 @@ def main(argument):
 
 					if write:
 
-						if argument.stepwise:							
+						if argument.stepwise:
+							renderingSubjectDescriptions[singlepdb]=pdbparsing(singlepdb, '^TITLE    [ \d](.*)$')							
 							pymolloadingFile.write("load {0}/{1}\n".format(os.getcwd(),singlepdb))
 							pymolloadingFile.write("hide all\n")			
 							pymolloadingFile.write("show cartoon, {0}\n".format(singlepdb[:-4]))
 							pymolloadingFile.write("show cartoon, {0}\n".format(pdb[:-4]))
-							pymolloadingFile.write("orient {0}\n".format(pdb[:-4]))
+							pymolloadingFile.write("color red, {0}\n".format(singlepdb[:-4]))
+							pymolloadingFile.write("color yellow, {0}\n".format(pdb[:-4]))
+							if not argument.view:
+								pymolloadingFile.write("orient {0}\n".format(pdb[:-4]))
 							pymolloadingFile.write("show cartoon, {0}\n".format(pdb[:-4]))
 							pymolloadingFile.write("png {0}.png\n".format(singlepdb[:-4]))
 						else:
@@ -210,8 +248,7 @@ def main(argument):
 										  stdout=subprocess.PIPE)
 					p_stdout = p.stdout.read()
 				if argument.stepwise:
-					htmlout(pdb,pdbparsing(pdb, '^TITLE    [ \d](.*)$'),subjectDescriptions,RMSDDic,QDic,alignedDic,pdb+'.html')
-
+					htmlout(pdb,pdbparsing(pdb, '^TITLE    [ \d](.*)$'),renderingSubjectDescriptions,tableSubjectDescriptions,RMSDDic,QDic,alignedDic,pdb+'.html')
 		sys.exit()		
 
 
@@ -230,7 +267,8 @@ if __name__ == "__main__":
 						help='Render 1:1 comparison')
 	parser.add_argument('-p', '--pymol', action='store_true', dest='render', default=False,
 						help='Execute PyMOL')
-	
+	parser.add_argument('-v', '--fixed_view', action='store', dest='view',
+						help='Filename which contains set_view command of PyMOL')
 
 	results = parser.parse_args()
 	main(results)

@@ -96,6 +96,7 @@ def main(arglist):
 				if re.match("^set_view",view[0]):
 					for line in view:
 						pymolLoadingFile.write(line)
+				f.close()
 
 		for pdb in subjectList:	
 			if os.path.exists(pdb):			
