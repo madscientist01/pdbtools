@@ -162,7 +162,9 @@ def main(argument):
 							# stdout from superpose will be saved into p_stdout
 							#
 							p_stdout = p.stdout.read()
-							
+							fw = open(superposedFilename[:len(superposedFilename)-4]+'.out','w')
+							fw.write(p_stdout)
+							fw.close()
 							#
 							# regex for the parsing output from superpose
 							# RMSD, Q, Transformation matrix and vector will be parsed out.
@@ -229,8 +231,10 @@ def main(argument):
 							pymolloadingFile.write("hide all\n")			
 							pymolloadingFile.write("show cartoon, {0}\n".format(singlepdb[:-4]))
 							pymolloadingFile.write("show cartoon, {0}\n".format(pdb[:-4]))
-							pymolloadingFile.write("color red, {0}\n".format(singlepdb[:-4]))
-							pymolloadingFile.write("color yellow, {0}\n".format(pdb[:-4]))
+							pymolloadingFile.write("util.cbc {0}\n".format(pdb[:-4]))
+							#pymolloadingFile.write("util.cbc {0},first_color=1\n".format(singlepdb[:-4]))
+							# pymolloadingFile.write("color red, {0}\n".format(singlepdb[:-4]))
+							# pymolloadingFile.write("color yellow, {0}\n".format(pdb[:-4]))
 							if not argument.view:
 								pymolloadingFile.write("orient {0}\n".format(pdb[:-4]))
 							pymolloadingFile.write("show cartoon, {0}\n".format(pdb[:-4]))
@@ -249,6 +253,9 @@ def main(argument):
 					p_stdout = p.stdout.read()
 				if argument.stepwise:
 					htmlout(pdb,pdbparsing(pdb, '^TITLE    [ \d](.*)$'),renderingSubjectDescriptions,tableSubjectDescriptions,RMSDDic,QDic,alignedDic,pdb+'.html')
+			else:
+				print "File is not exist!"
+
 		sys.exit()		
 
 
@@ -257,11 +264,11 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-r', '--reference_pdb', nargs='+', dest='files',default=[],
 	                    help='Files to process')
-	parser.add_argument('-d', '--rmsd_cutoff', action='store', dest='rmsd',
+	parser.add_argument('-d', '--rmsd_cutoff', action='store', dest='rmsd',type=float,
 						help='Set RMSD cutoff')
-	parser.add_argument('-s', '--score_cutoff', action='store', dest='score',
+	parser.add_argument('-s', '--score_cutoff', action='store', dest='score',type=float,
 						help='Set Q Score cutoff')	
-	parser.add_argument('-a', '--align_cutoff', action='store', dest='align',
+	parser.add_argument('-a', '--align_cutoff', action='store', dest='align',type=float,
 						help='Set alignment length cutoff')		
 	parser.add_argument('-t', '--stepwise_compare_rendering', action='store_true', dest='stepwise', default=False,
 						help='Render 1:1 comparison')
