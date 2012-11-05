@@ -104,17 +104,18 @@ def main(argument):
 if __name__ == "__main__":
 
 	parser = argparse.ArgumentParser()
+	group = parser.add_mutually_exclusive_group()
 	parser.add_argument('-f', '--files', nargs='*', dest='files',default=[],
 	                    help='Files to process')
-	parser.add_argument('-e', '--extract', action='store', dest='extract', 
-						help='Set chain to extract')
-	parser.add_argument('-x', '--exclude', action='store', dest='exclude',
-						help='Set chain to exclude')	
-	parser.add_argument('-s', '--split', action='store_true', dest='split', default=False,
-						help='Split all of chains to seperate PDB')
 	parser.add_argument('-t', '--no_header', action='store_false', dest='header', default=True,
 						help='Strip PDB header')
 	parser.add_argument('-l', '--list', action='store', dest='list', default='extractlist.txt',
 						help='Saved List')
+	group.add_argument('-e', '--extract', action='store', dest='extract', 
+						help='Set chain to extract')
+	group.add_argument('-x', '--exclude', action='store', dest='exclude',
+						help='Set chain to exclude')	
+	group.add_argument('-s', '--split', action='store_true', dest='split', default=False,
+						help='Split all of chains to seperate PDB')
 	results = parser.parse_args()
 	main(results)
