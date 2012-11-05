@@ -26,16 +26,17 @@ def PDBParse(pdb,argument):
 					chainContent = []
 					currentChain = chainid
 					chains[currentChain]=chainContent	
-				chains[currentChain].append(line)	
+				chains[chainid].append(line)	
 	return(headers,chains)
+
 
 def pdbProcess(filename, argument):
 #
 # Parse pdb content and extract using regex
 #
 	[header,chains] = PDBParse(filename,argument)
-	print "processing {0}".format(filename)
-
+	print "processing {0}".format(filename)	
+	newFileName=""
 	if argument.extract or argument.exclude:
 	
 		f = open("temp.pdb",'w')
@@ -57,19 +58,22 @@ def pdbProcess(filename, argument):
 					includedChain=includedChain+chain
 		f.close()
 		if len(includedChain)>0:
-			os.rename("temp.pdb",filename[:len(filename)-4]+"_"+includedChain+".pdb")
+			newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
+			os.rename("temp.pdb",newFileName)
 		else:
 			os.remove("temp.pdb")
 
 	if argument.split:
 
 		for chain in chains:
-			f = open(filename[:len(filename)-4]+"_"+chain+".pdb",'w')
+			newFileName =filename[:len(filename)-4]+"_"+chain+".pdb" 
+			f = open(newFileName,'w')
 			if argument.header:
 				f.writelines(header)
 			f.writelines(chains[chain])
 			f.close()
-	return ()
+
+	return (newFileName)
 
 def main(argument):
 
@@ -78,13 +82,23 @@ def main(argument):
 	else:
 		pdbList=glob.glob('*.pdb')
 
-		for pdb in pdbList:	
-			if os.path.exists(pdb):
-				pdbProcess(pdb,argument)
-				# pdbProcessing(pdb,argument)				
-			else:
-				print "{0} is not exist!".format(pdb)
-		sys.exit()		
+
+	writtenFileList = []
+	for pdb in pdbList:	
+		if os.path.exists(pdb):
+
+			filename = pdbProcess(pdb,argument)
+			if len(filename)>0:
+				writtenFileList.append(filename+"\n")
+		else:
+			print "{0} is not exist!".format(pdb)
+
+	if len(writtenFileList)>0:
+		f = open (argument.list,'w')
+		f.writelines(writtenFileList)
+		f.close
+
+	sys.exit()		
 
 
 if __name__ == "__main__":
@@ -100,7 +114,7 @@ if __name__ == "__main__":
 						help='Split all of chains to seperate PDB')
 	parser.add_argument('-t', '--no_header', action='store_false', dest='header', default=True,
 						help='Strip PDB header')
-
-
+	parser.add_argument('-l', '--list', action='store', dest='list', default='extractlist.txt',
+						help='Saved List')
 	results = parser.parse_args()
 	main(results)
