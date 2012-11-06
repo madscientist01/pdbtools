@@ -1,14 +1,23 @@
 #!/usr/bin/python
 #
-# PDBExtract
+# PDBExtract.py
+# General Purpose Protein Data Bank (PDB) file manipulation utility
+#
+# Written by MadScientist
+# http://github.com/madscientist01
+# http://madscientist.wordpress.com
 #
 #
+
 import sys, subprocess, re, os, glob, argparse
 import warnings
 
 def PDBParse(pdb,argument):
 	headers = []
-	headerRecordList = ["HEADER","TITLE","COMPND","SOURCE","KEYWDS","EXPDTA","AUTHOR","REVDAT","JRNL","REMARK","DBREF","SEQRES","MODRES","HET","HETNAM","HETSYN","FORMUL","HELIX","SHEET","LINK","SITE","CRYST1","ORIGX1","ORIGX2","ORIGX3","SCALE1","SCALE2","SCALE3"]
+	headerRecordList = ["HEADER","TITLE","COMPND","SOURCE","KEYWDS","EXPDTA","AUTHOR",\
+						"REVDAT","JRNL","REMARK","DBREF","SEQRES","MODRES","HET","HETNAM",\
+						"HETSYN","FORMUL","HELIX","SHEET","LINK","SITE","CRYST1","ORIGX1",\
+						"ORIGX2","ORIGX3","SCALE1","SCALE2","SCALE3"]
 	dataRecordList = ["ATOM", "TER", "HETATM"]
 	chains = {}
 	currentChain = ''
@@ -29,6 +38,10 @@ def PDBParse(pdb,argument):
 	return(headers,chains)
 
 def fastaParsing(header):
+#
+# Parse SEQRES lines in PDB REMAKR and save it as one letter codes.
+#
+#
 	oneLetter ={'VAL':'V', 'ILE':'I', 'LEU':'L', 'GLU':'E', 'GLN':'Q', \
 	'ASP':'D', 'ASN':'N', 'HIS':'H', 'TRP':'W', 'PHE':'F', 'TYR':'Y',    \
 	'ARG':'R', 'LYS':'K', 'SER':'S', 'THR':'T', 'MET':'M', 'ALA':'A',    \
@@ -55,6 +68,9 @@ def fastaParsing(header):
 	return(seqres)
 
 def fastaSplit(fasta,width):
+#
+# split sequence in fasta string into predefined width of string lists
+#
 
 	cursor = 0
 	end = 0
@@ -103,7 +119,6 @@ def pdbProcess(filename, argument):
 			os.remove("temp.pdb")
 
 	if argument.split:
-
 		for chain in chains:
 			newFileName =filename[:len(filename)-4]+"_"+chain+".pdb" 
 			f = open(newFileName,'w')
