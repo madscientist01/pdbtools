@@ -14,7 +14,7 @@ import warnings
 from Bio import pairwise2
 from Bio.SubsMat import MatrixInfo as matlist
 
-def PDBParse(pdb):
+def PDBParse(pdb,filter,hetero):
 		headers = []
 		headerRecordList = ["HEADER","TITLE","COMPND","SOURCE","KEYWDS","EXPDTA","AUTHOR",\
 							"REVDAT","JRNL","REMARK","DBREF","SEQRES","MODRES","HET","HETNAM",\
@@ -35,8 +35,18 @@ def PDBParse(pdb):
 					chainid = line [21:22]
 					if not chainid in chains:
 						chainContent = []
-						chains[chainid]=chainContent	
-					chains[chainid].append(line)	
+						chains[chainid]=chainContent
+
+					append = True
+					if hetero and head == "HETATM":
+						append = False
+
+					if filter == line[17:20]:
+						append = False
+
+					if append :
+						chains[chainid].append(line)
+
 		return(headers,chains)
 
 def fastaParsing (header):
@@ -98,16 +108,18 @@ class PDBExtract(object):
 		self.exclude=kwargs['exclude']
 		self.split = kwargs['split']
 		self.unique = kwargs['unique']
+		self.filter = kwargs['filter']
+		self.hetero = kwargs['hetero']
 
 	def pdbProcess(self, filename):
 	#
 	# Parse pdb content and extract using regex
 	#
-		[header,chains] = PDBParse(filename)
+		[header,chains] = PDBParse(filename, self.filter, self.hetero)
 		print "processing {0}".format(filename)	
 		newFileName=""
+
 		if self.extract or self.exclude:
-		
 			f = open("temp.pdb",'w')
 			if self.header:
 				f.writelines(header)
@@ -118,7 +130,6 @@ class PDBExtract(object):
 					if chain in chains:
 						f.writelines(chains[chain])
 						includedChain=includedChain+chain
-
 			if self.exclude:
 				excludelist = self.exclude.split()
 				for chain in chains:
@@ -150,10 +161,8 @@ class PDBExtract(object):
 				buffer = fastaSplit(sequence[chain],60)
 				f.writelines(buffer)
 			f.close()
-		
 
 		if self.unique:
-
 			sequence = fastaParsing(header)
 			sequences = []
 			includeList = {}
@@ -197,6 +206,16 @@ class PDBExtract(object):
 			else:
 				os.remove("temp.pdb")
 
+		if (self.hetero or self.filter) and (not self.exclude and not self.unique and not self.extract and not self.split):
+			newFileName = filename[:len(filename)-4]+"_filtered"+".pdb"
+			f = open(newFileName,'w')
+			if self.header:
+				f.writelines(header)
+				for chain in chains:
+					f.writelines(chains[chain])
+			f.close()
+
+
 		return (newFileName)
 
 	def go(self):
@@ -205,7 +224,6 @@ class PDBExtract(object):
 			pdbList=self.files
 		else:
 			pdbList=glob.glob('*.pdb')
-
 
 		writtenFileList = []
 		for pdb in pdbList:	
@@ -236,6 +254,10 @@ if __name__ == "__main__":
 						help='Saved List')
 	parser.add_argument('-a', '--fasta',action='store_true', dest='fasta',default=False,
 						help='Extract Fasta')
+	parser.add_argument('-r', '--remove_residue', action='store', dest='filter', 
+						help='Remove designated type of residues. if you want to remove waters, -r HOH')
+	parser.add_argument('-ht', '--remove_heteroatom', action='store_true', dest='hetero', default=False,
+						help='Remove heteroatom')
 	group.add_argument('-e', '--extract', action='store', dest='extract', 
 						help='Set chain to extract')
 	group.add_argument('-x', '--exclude', action='store', dest='exclude',
@@ -244,7 +266,9 @@ if __name__ == "__main__":
 						help='Split all of chains to seperate PDB')
 	group.add_argument('-u', '--unique', action='store_true', dest='unique', default=False,
 						help='Extract only chains have uniq sequence')
+	
 	results = parser.parse_args()
 	pdbExtract = PDBExtract(files=results.files, header=results.header, list=results.list, fasta=results.fasta,\
-							extract=results.extract, exclude=results.exclude, split=results.split, unique=results.unique)
+							extract=results.extract, exclude=results.exclude, split=results.split,\
+							unique=results.unique, filter=results.filter, hetero=results.hetero)
 	fileList = pdbExtract.go()
