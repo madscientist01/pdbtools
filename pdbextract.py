@@ -14,33 +14,32 @@ import warnings
 from Bio import pairwise2
 from Bio.SubsMat import MatrixInfo as matlist
 
-
-def PDBParse(pdb,argument):
-	headers = []
-	headerRecordList = ["HEADER","TITLE","COMPND","SOURCE","KEYWDS","EXPDTA","AUTHOR",\
-						"REVDAT","JRNL","REMARK","DBREF","SEQRES","MODRES","HET","HETNAM",\
-						"HETSYN","FORMUL","HELIX","SHEET","LINK","SITE","CRYST1","ORIGX1",\
-						"ORIGX2","ORIGX3","SCALE1","SCALE2","SCALE3"]
-	dataRecordList = ["ATOM", "TER", "HETATM"]
-	chains = {}
-	currentChain = ''
-	if os.path.exists(pdb):
-		f = open(pdb)
-		line = f.readline()
-		while line:
+def PDBParse(pdb):
+		headers = []
+		headerRecordList = ["HEADER","TITLE","COMPND","SOURCE","KEYWDS","EXPDTA","AUTHOR",\
+							"REVDAT","JRNL","REMARK","DBREF","SEQRES","MODRES","HET","HETNAM",\
+							"HETSYN","FORMUL","HELIX","SHEET","LINK","SITE","CRYST1","ORIGX1",\
+							"ORIGX2","ORIGX3","SCALE1","SCALE2","SCALE3"]
+		dataRecordList = ["ATOM", "TER", "HETATM"]
+		chains = {}
+		currentChain = ''
+		if os.path.exists(pdb):
+			f = open(pdb)
 			line = f.readline()
-			head = line[0:6].strip()
-			if head in headerRecordList:
-				headers.append(line)
-			if head in dataRecordList:
-				chainid = line [21:22]
-				if not chainid in chains:
-					chainContent = []
-					chains[chainid]=chainContent	
-				chains[chainid].append(line)	
-	return(headers,chains)
+			while line:
+				line = f.readline()
+				head = line[0:6].strip()
+				if head in headerRecordList:
+					headers.append(line)
+				if head in dataRecordList:
+					chainid = line [21:22]
+					if not chainid in chains:
+						chainContent = []
+						chains[chainid]=chainContent	
+					chains[chainid].append(line)	
+		return(headers,chains)
 
-def fastaParsing(header):
+def fastaParsing (header):
 #
 # Parse SEQRES lines in PDB REMAKR and save it as one letter codes.
 #
@@ -87,126 +86,143 @@ def fastaSplit(fasta,width):
 		cursor+=width
 	return(buffer)	
 
+class PDBExtract(object):
 
-def pdbProcess(filename, argument):
-#
-# Parse pdb content and extract using regex
-#
-	[header,chains] = PDBParse(filename,argument)
-	print "processing {0}".format(filename)	
-	newFileName=""
-	if argument.extract or argument.exclude:
-	
-		f = open("temp.pdb",'w')
-		if argument.header:
-			f.writelines(header)
-		includedChain=""
-		if argument.extract:
-			chainlist = argument.extract.split()
-			for chain in chainlist:
-				if chain in chains:
-					f.writelines(chains[chain])
-					includedChain=includedChain+chain
+	def __init__(self, **kwargs):
 
-		if argument.exclude:
-			excludelist = argument.exclude.split()
-			for chain in chains:
-				if chain in chains and not chain in excludelist:
-					f.writelines(chains[chain])
-					includedChain=includedChain+chain
-		f.close()
-		if len(includedChain)>0:
-			newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
-			os.rename("temp.pdb",newFileName)
-		else:
-			os.remove("temp.pdb")
+		self.files=kwargs['files']
+		self.header=kwargs['header']
+		self.list = kwargs['list']
+		self.fasta=kwargs['fasta']
+		self.extract=kwargs['extract']
+		self.exclude=kwargs['exclude']
+		self.split = kwargs['split']
+		self.unique = kwargs['unique']
 
-	if argument.split:
-		for chain in chains:
-			newFileName =filename[:len(filename)-4]+"_"+chain+".pdb" 
-			f = open(newFileName,'w')
-			if argument.header:
+	def pdbProcess(self, filename):
+	#
+	# Parse pdb content and extract using regex
+	#
+		[header,chains] = PDBParse(filename)
+		print "processing {0}".format(filename)	
+		newFileName=""
+		if self.extract or self.exclude:
+		
+			f = open("temp.pdb",'w')
+			if self.header:
 				f.writelines(header)
-			f.writelines(chains[chain])
+			includedChain=""
+			if self.extract:
+				chainlist = self.extract.split()
+				for chain in chainlist:
+					if chain in chains:
+						f.writelines(chains[chain])
+						includedChain=includedChain+chain
+
+			if self.exclude:
+				excludelist = self.exclude.split()
+				for chain in chains:
+					if chain in chains and not chain in excludelist:
+						f.writelines(chains[chain])
+						includedChain=includedChain+chain
+			f.close()
+			if len(includedChain)>0:
+				newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
+				os.rename("temp.pdb",newFileName)
+			else:
+				os.remove("temp.pdb")
+
+		if self.split:
+			for chain in chains:
+				newFileName =filename[:len(filename)-4]+"_"+chain+".pdb" 
+				f = open(newFileName,'w')
+				if self.header:
+					f.writelines(header)
+				f.writelines(chains[chain])
+				f.close()
+
+		if self.fasta:
+			sequence = fastaParsing(header)
+			newFileName =filename[:len(filename)-4]+".fasta" 
+			f = open(newFileName,'w')
+			for chain in sorted(sequence.iterkeys()):
+				f.write(">{0}\n".format(chain))
+				buffer = fastaSplit(sequence[chain],60)
+				f.writelines(buffer)
+			f.close()
+		
+
+		if self.unique:
+
+			sequence = fastaParsing(header)
+			sequences = []
+			includeList = {}
+			for chain in sequence:
+				sequences.append(sequence[chain])
+				includeList[chain] = True
+
+			chainlist = sequence.keys()
+			#
+			# Using pairwise2 module in BioPython, carry out pairwise alignment with all of PDB chains.
+			# if two alignment give score higher than length of aa*3, it is considered as redundant chain
+			# and it will be removed.
+			#
+			if len(sequences)>1:
+				gapOpen=-10
+				gapExtend=-0.5
+				matrix = matlist.blosum62
+				for i in range(len(sequences)):
+					for j in range(i+1, len(sequences)):
+						aln = pairwise2.align.globalds(sequences[i],sequences[j],matrix,gapOpen,gapExtend)
+						query,subject,score,begin,end = aln[0]
+						cutoff = len(sequences[i])*3
+						if cutoff < score:
+							includeList[chainlist[j]] = False
+	#					print chainlist[i],chainlist[j],len(sequences[i]),len(sequences[j]), score
+			
+			f = open("temp.pdb",'w')
+			if self.header:
+				f.writelines(header)
+			
+			includedChain = ''
+			for chain in includeList:
+				if includeList[chain]:
+					f.writelines(chains[chain])
+					includedChain=includedChain+chain
 			f.close()
 
-	if argument.fasta:
-		sequence = fastaParsing(header)
-		newFileName =filename[:len(filename)-4]+".fasta" 
-		f = open(newFileName,'w')
-		for chain in sorted(sequence.iterkeys()):
-			f.write(">{0}\n".format(chain))
-			buffer = fastaSplit(sequence[chain],60)
-			f.writelines(buffer)
-		f.close()
+			if len(includedChain)>0:
+				newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
+				os.rename("temp.pdb",newFileName)
+			else:
+				os.remove("temp.pdb")
+
+		return (newFileName)
+
+	def go(self):
+
+		if len(self.files)>0 :
+			pdbList=self.files
+		else:
+			pdbList=glob.glob('*.pdb')
+
+
+		writtenFileList = []
+		for pdb in pdbList:	
+			if os.path.exists(pdb):
+				filename = self.pdbProcess(pdb)
+				if len(filename)>0:
+					writtenFileList.append(filename+"\n")
+			else:
+				print "{0} is not exist!".format(pdb)
+
+		if len(writtenFileList)>0:
+			f = open (self.list,'w')
+			f.writelines(writtenFileList)
+			f.close
+
+		return(writtenFileList)
 	
-	if argument.unique:
-
-		sequence = fastaParsing(header)
-		sequences = []
-		includeList = {}
-		for chain in sequence:
-			sequences.append(sequence[chain])
-			includeList[chain] = True
-
-		chainlist = sequence.keys()
-		if len(sequences)>1:
-			gapOpen=-10
-			gapExtend=-0.5
-			matrix = matlist.blosum62
-			
-			for i in range(len(sequences)):
-				for j in range(i+1, len(sequences)):
-					aln = pairwise2.align.globalds(sequences[i],sequences[j],matrix,gapOpen,gapExtend)
-					query,subject,score,begin,end = aln[0]
-					cutoff = len(sequences[i])*3
-					if cutoff < score:
-						includeList[chainlist[j]] = False
-#					print chainlist[i],chainlist[j],len(sequences[i]),len(sequences[j]), score
-		
-		f = open("temp.pdb",'w')
-		if argument.header:
-			f.writelines(header)
-		
-		includedChain = ''
-		for chain in includeList:
-			if includeList[chain]:
-				f.writelines(chains[chain])
-				includedChain=includedChain+chain
-		f.close()
-		if len(includedChain)>0:
-			newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
-			os.rename("temp.pdb",newFileName)
-		else:
-			os.remove("temp.pdb")
-
-	return (newFileName)
-
-def main(argument):
-
-	if len(argument.files)>0 :
-		pdbList=argument.files
-	else:
-		pdbList=glob.glob('*.pdb')
-
-
-	writtenFileList = []
-	for pdb in pdbList:	
-		if os.path.exists(pdb):
-
-			filename = pdbProcess(pdb,argument)
-			if len(filename)>0:
-				writtenFileList.append(filename+"\n")
-		else:
-			print "{0} is not exist!".format(pdb)
-
-	if len(writtenFileList)>0:
-		f = open (argument.list,'w')
-		f.writelines(writtenFileList)
-		f.close
-
-	sys.exit()		
-
 
 if __name__ == "__main__":
 
@@ -228,7 +244,7 @@ if __name__ == "__main__":
 						help='Split all of chains to seperate PDB')
 	group.add_argument('-u', '--unique', action='store_true', dest='unique', default=False,
 						help='Extract only chains have uniq sequence')
-
-
 	results = parser.parse_args()
-	main(results)
+	pdbExtract = PDBExtract(files=results.files, header=results.header, list=results.list, fasta=results.fasta,\
+							extract=results.extract, exclude=results.exclude, split=results.split, unique=results.unique)
+	fileList = pdbExtract.go()
