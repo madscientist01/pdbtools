@@ -24,10 +24,49 @@ def PDBParse(pdb,argument):
 				chainid = line [21:22]
 				if not chainid in chains:
 					chainContent = []
-					currentChain = chainid
-					chains[currentChain]=chainContent	
+					chains[chainid]=chainContent	
 				chains[chainid].append(line)	
 	return(headers,chains)
+
+def fastaParsing(header):
+	oneLetter ={'VAL':'V', 'ILE':'I', 'LEU':'L', 'GLU':'E', 'GLN':'Q', \
+	'ASP':'D', 'ASN':'N', 'HIS':'H', 'TRP':'W', 'PHE':'F', 'TYR':'Y',    \
+	'ARG':'R', 'LYS':'K', 'SER':'S', 'THR':'T', 'MET':'M', 'ALA':'A',    \
+	'GLY':'G', 'PRO':'P', 'CYS':'C', 'MSE':'M'}
+	seqres = {}
+	chains = {}
+	for line in header:
+		if line[0:6] == "SEQRES":
+			chainid = line[11:12]
+			
+			if not chainid in chains:
+				chains[chainid] = ''
+			chains[chainid] = chains[chainid]+line[19:70].strip()+' '
+
+	for chain in chains:
+		aa = chains[chain].strip().split(' ')
+		aminoAcids = ''
+		for a in aa:
+			if a in oneLetter:
+				aminoAcids = aminoAcids+oneLetter[a]
+			else:
+				aminoAcids = aminoAcids + 'X'
+		seqres[chain] = aminoAcids
+	return(seqres)
+
+def fastaSplit(fasta,width):
+
+	cursor = 0
+	end = 0
+	buffer = []
+	while (cursor <len(fasta)):
+		if (len(fasta)-cursor) > width:
+			end+=width
+		else:
+			end=len(fasta)		
+		buffer.append(fasta[cursor:end]+"\n")
+		cursor+=width
+	return(buffer)	
 
 
 def pdbProcess(filename, argument):
@@ -73,6 +112,16 @@ def pdbProcess(filename, argument):
 			f.writelines(chains[chain])
 			f.close()
 
+	if argument.fasta:
+		sequence = fastaParsing(header)
+		newFileName =filename[:len(filename)-4]+".fasta" 
+		f = open(newFileName,'w')
+		for chain in sorted(sequence.iterkeys()):
+			f.write(">{0}\n".format(chain))
+			buffer = fastaSplit(sequence[chain],60)
+			f.writelines(buffer)
+		f.close()
+	
 	return (newFileName)
 
 def main(argument):
@@ -111,11 +160,15 @@ if __name__ == "__main__":
 						help='Strip PDB header')
 	parser.add_argument('-l', '--list', action='store', dest='list', default='extractlist.txt',
 						help='Saved List')
+	parser.add_argument('-a', '--fasta',action='store_true', dest='fasta',default=False,
+						help='Extract Fasta')
 	group.add_argument('-e', '--extract', action='store', dest='extract', 
 						help='Set chain to extract')
 	group.add_argument('-x', '--exclude', action='store', dest='exclude',
 						help='Set chain to exclude')	
 	group.add_argument('-s', '--split', action='store_true', dest='split', default=False,
 						help='Split all of chains to seperate PDB')
+
+
 	results = parser.parse_args()
 	main(results)
