@@ -11,6 +11,9 @@
 
 import sys, subprocess, re, os, glob, argparse
 import warnings
+from Bio import pairwise2
+from Bio.SubsMat import MatrixInfo as matlist
+
 
 def PDBParse(pdb,argument):
 	headers = []
@@ -137,6 +140,46 @@ def pdbProcess(filename, argument):
 			f.writelines(buffer)
 		f.close()
 	
+	if argument.unique:
+
+		sequence = fastaParsing(header)
+		sequences = []
+		includeList = {}
+		for chain in sequence:
+			sequences.append(sequence[chain])
+			includeList[chain] = True
+
+		chainlist = sequence.keys()
+		if len(sequences)>1:
+			gapOpen=-10
+			gapExtend=-0.5
+			matrix = matlist.blosum62
+			
+			for i in range(len(sequences)):
+				for j in range(i+1, len(sequences)):
+					aln = pairwise2.align.globalds(sequences[i],sequences[j],matrix,gapOpen,gapExtend)
+					query,subject,score,begin,end = aln[0]
+					cutoff = len(sequences[i])*3
+					if cutoff < score:
+						includeList[chainlist[j]] = False
+#					print chainlist[i],chainlist[j],len(sequences[i]),len(sequences[j]), score
+		
+		f = open("temp.pdb",'w')
+		if argument.header:
+			f.writelines(header)
+		
+		includedChain = ''
+		for chain in includeList:
+			if includeList[chain]:
+				f.writelines(chains[chain])
+				includedChain=includedChain+chain
+		f.close()
+		if len(includedChain)>0:
+			newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
+			os.rename("temp.pdb",newFileName)
+		else:
+			os.remove("temp.pdb")
+
 	return (newFileName)
 
 def main(argument):
@@ -183,6 +226,8 @@ if __name__ == "__main__":
 						help='Set chain to exclude')	
 	group.add_argument('-s', '--split', action='store_true', dest='split', default=False,
 						help='Split all of chains to seperate PDB')
+	group.add_argument('-u', '--unique', action='store_true', dest='unique', default=False,
+						help='Extract only chains have uniq sequence')
 
 
 	results = parser.parse_args()
