@@ -6,7 +6,7 @@
 # Written by MadScientist
 # http://github.com/madscientist01
 # http://madscientist.wordpress.com
-#
+# Require Python 2.6 or recent and BioPython
 #
 
 import sys, subprocess, re, os, glob, argparse
@@ -14,7 +14,29 @@ import warnings
 from Bio import pairwise2
 from Bio.SubsMat import MatrixInfo as matlist
 
+
+def readFasta(filename) :
+
+	sequence = ''
+	sequenceName = ''
+	if os.path.exists(filename):
+		
+		f = open(filename)
+		while True:
+			line = f.readline().strip()
+			if not line: 
+				break 
+			match = re.match('^>(.*)',line)
+			if match:
+				sequenceName = match.group(1)
+			else:
+				sequence = sequence+line			
+		return(sequenceName,sequence)	    	
+	else:
+		return()
+
 def PDBParse(pdb,filter,hetero):
+
 		headers = []
 		headerRecordList = ["HEADER","TITLE","COMPND","SOURCE","KEYWDS","EXPDTA","AUTHOR",\
 							"REVDAT","JRNL","REMARK","DBREF","SEQRES","MODRES","HET","HETNAM",\
@@ -96,20 +118,55 @@ def fastaSplit(fasta,width):
 		cursor+=width
 	return(buffer)	
 
+
+def saveChains(chains,header,includeList,filename):
+
+	f = open("temp.pdb",'w')
+	if header:
+		f.writelines(header)
+	
+	includedChain = ''
+
+	for chain in includeList:
+		if includeList[chain]:
+			f.writelines(chains[chain])
+			includedChain=includedChain+chain
+	f.close()
+
+	if len(includedChain)>0:
+		newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
+		os.rename("temp.pdb",newFileName)
+	else:
+		os.remove("temp.pdb")
+
+	return (newFileName)
+
+
+
 class PDBExtract(object):
 
 	def __init__(self, **kwargs):
 
-		self.files=kwargs['files']
-		self.header=kwargs['header']
-		self.list = kwargs['list']
-		self.fasta=kwargs['fasta']
-		self.extract=kwargs['extract']
-		self.exclude=kwargs['exclude']
-		self.split = kwargs['split']
-		self.unique = kwargs['unique']
-		self.filter = kwargs['filter']
-		self.hetero = kwargs['hetero']
+		self.files=kwargs.get('files')
+		self.fof = kwargs.get('fof')
+		self.header=kwargs.get('header')
+		self.list = kwargs.get('list')
+		self.fasta=kwargs.get('fasta')
+		self.extract=kwargs.get('extract')
+		self.exclude=kwargs.get('exclude')
+		self.split = kwargs.get('split')
+		self.unique = kwargs.get('unique')
+		self.filter = kwargs.get('filter')
+		self.hetero = kwargs.get('hetero')
+		self.excludeseq = kwargs.get('excludeseq')
+		self.extractseq = kwargs.get('extractseq')
+		if self.extractseq or self.excludeseq:
+			if self.extractseq:
+				filename = self.extractseq
+			elif self.excludeseq:
+				filename = self.excludeseq
+			(self.querySeqFastaName, self.querySeqFasta) = readFasta(filename)
+
 
 	def pdbProcess(self, filename):
 	#
@@ -162,6 +219,27 @@ class PDBExtract(object):
 				f.writelines(buffer)
 			f.close()
 
+		if self.extractseq or self.excludeseq:
+			sequence = fastaParsing(header)
+			includeList = {}
+			gapOpen=-10
+			gapExtend=-0.5
+			matrix = matlist.blosum62
+			for chain in sequence:
+
+				aln = pairwise2.align.globalds(self.querySeqFasta,sequence[chain],matrix,gapOpen,gapExtend)
+				query,subject,score,begin,end = aln[0]
+				cutoff = len(self.querySeqFasta)*4
+				if cutoff < score :
+					if self.extractseq:
+						includeList[chain]=True
+				elif self.excludeseq:
+						includeList[chain]=False
+
+			newFileName = saveChains(chains,header,includeList,filename)
+
+
+
 		if self.unique:
 			sequence = fastaParsing(header)
 			sequences = []
@@ -187,41 +265,29 @@ class PDBExtract(object):
 						cutoff = len(sequences[i])*3
 						if cutoff < score:
 							includeList[chainlist[j]] = False
-	#					print chainlist[i],chainlist[j],len(sequences[i]),len(sequences[j]), score
-			
-			f = open("temp.pdb",'w')
-			if self.header:
-				f.writelines(header)
-			
-			includedChain = ''
-			for chain in includeList:
-				if includeList[chain]:
-					f.writelines(chains[chain])
-					includedChain=includedChain+chain
-			f.close()
 
-			if len(includedChain)>0:
-				newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
-				os.rename("temp.pdb",newFileName)
-			else:
-				os.remove("temp.pdb")
+				newFileName = saveChains(chains,header,includeList,filename)
+		
 
 		if (self.hetero or self.filter) and (not self.exclude and not self.unique and not self.extract and not self.split):
 			newFileName = filename[:len(filename)-4]+"_filtered"+".pdb"
 			f = open(newFileName,'w')
 			if self.header:
 				f.writelines(header)
-				for chain in chains:
-					f.writelines(chains[chain])
+				[f.writelines(chains[chain]) for chain in chains]
 			f.close()
-
-
 		return (newFileName)
 
 	def go(self):
 
-		if len(self.files)>0 :
+		if self.files:
 			pdbList=self.files
+			
+		elif self.fof and os.path.exists(self.fof):
+			f = open (self.fof)
+			pdbList=f.readlines()
+			f.close()
+			pdbList = [x.strip() for x in pdbList]
 		else:
 			pdbList=glob.glob('*.pdb')
 
@@ -238,16 +304,17 @@ class PDBExtract(object):
 			f = open (self.list,'w')
 			f.writelines(writtenFileList)
 			f.close
-
 		return(writtenFileList)
-	
 
 if __name__ == "__main__":
 
 	parser = argparse.ArgumentParser()
 	group = parser.add_mutually_exclusive_group()
-	parser.add_argument('-f', '--files', nargs='*', dest='files',default=[],
+	filegroup = parser.add_mutually_exclusive_group()
+	filegroup.add_argument('-f', '--files', nargs='*', dest='files',default=[],
 	                    help='Files to process')
+	filegroup.add_argument('-T', '--files-from',  dest='fof',
+	                    help='Files from file of names')
 	parser.add_argument('-t', '--no_header', action='store_false', dest='header', default=True,
 						help='Strip PDB header')
 	parser.add_argument('-l', '--list', action='store', dest='list', default='extractlist.txt',
@@ -261,14 +328,19 @@ if __name__ == "__main__":
 	group.add_argument('-e', '--extract', action='store', dest='extract', 
 						help='Set chain to extract')
 	group.add_argument('-x', '--exclude', action='store', dest='exclude',
-						help='Set chain to exclude')	
+						help='Set chain to exclude')
+	group.add_argument('-E', '--extract_sequence', action='store', dest='extractseq', 
+						help='Extract PDB chains based on the protein sequences')
+	group.add_argument('-X', '--exclude_sequence', action='store', dest='excludeseq',
+						help='Exclude PDB chains based on the protein sequences')
 	group.add_argument('-s', '--split', action='store_true', dest='split', default=False,
 						help='Split all of chains to seperate PDB')
 	group.add_argument('-u', '--unique', action='store_true', dest='unique', default=False,
-						help='Extract only chains have uniq sequence')
+						help='Extract only unique PDB chains ')
 	
 	results = parser.parse_args()
-	pdbExtract = PDBExtract(files=results.files, header=results.header, list=results.list, fasta=results.fasta,\
-							extract=results.extract, exclude=results.exclude, split=results.split,\
-							unique=results.unique, filter=results.filter, hetero=results.hetero)
+	pdbExtract = PDBExtract(files=results.files, fof=results.fof, header=results.header, list=results.list,\
+							fasta=results.fasta, extract=results.extract, exclude=results.exclude,\
+							split=results.split, unique=results.unique, filter=results.filter,\
+							hetero=results.hetero, extractseq=results.extractseq, excludeseq=results.excludeseq)
 	fileList = pdbExtract.go()
