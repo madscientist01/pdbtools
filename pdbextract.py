@@ -126,18 +126,17 @@ def saveChains(chains,header,includeList,filename):
 		f.writelines(header)
 	
 	includedChain = ''
-
-	for chain in includeList:
+	for chain in sorted(includeList.iterkeys()):
 		if includeList[chain]:
 			f.writelines(chains[chain])
 			includedChain=includedChain+chain
 	f.close()
-
 	if len(includedChain)>0:
 		newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
 		os.rename("temp.pdb",newFileName)
 	else:
 		os.remove("temp.pdb")
+		newFileName=''
 
 	return (newFileName)
 
@@ -220,24 +219,38 @@ class PDBExtract(object):
 			f.close()
 
 		if self.extractseq or self.excludeseq:
+
+#
+# header seqres problem needed to fix
+#
+#
+
 			sequence = fastaParsing(header)
-			includeList = {}
-			gapOpen=-10
-			gapExtend=-0.5
-			matrix = matlist.blosum62
-			for chain in sequence:
+			if len(sequence)>1:
+				includeList = {}
+				gapOpen=-10
+				gapExtend=-0.5
+				matrix = matlist.blosum62
 
-				aln = pairwise2.align.globalds(self.querySeqFasta,sequence[chain],matrix,gapOpen,gapExtend)
-				query,subject,score,begin,end = aln[0]
-				cutoff = len(self.querySeqFasta)*4
-				if cutoff < score :
-					if self.extractseq:
-						includeList[chain]=True
-				elif self.excludeseq:
-						includeList[chain]=False
+				for chain in sequence:
+					
+					aln = pairwise2.align.globalds(self.querySeqFasta,sequence[chain],matrix,gapOpen,gapExtend)
+					query,subject,score,begin,end = aln[0]
+					cutoff = len(self.querySeqFasta)*4
+					if cutoff < score :
+						if self.extractseq:
+							includeList[chain]=True
+						if self.excludeseq:
+							includeList[chain]=False	
+					else: 
+						if self.extractseq:
+							includeList[chain]=False
+						if self.excludeseq:
+							includeList[chain]=True
 
-			newFileName = saveChains(chains,header,includeList,filename)
-
+				newFileName = saveChains(chains,header,includeList,filename)
+			else:
+				newFileName=''
 
 
 		if self.unique:
@@ -268,7 +281,6 @@ class PDBExtract(object):
 
 				newFileName = saveChains(chains,header,includeList,filename)
 		
-
 		if (self.hetero or self.filter) and (not self.exclude and not self.unique and not self.extract and not self.split):
 			newFileName = filename[:len(filename)-4]+"_filtered"+".pdb"
 			f = open(newFileName,'w')
