@@ -101,6 +101,22 @@ def fastaParsing (header):
 		seqres[chain] = aminoAcids
 	return(seqres)
 
+def filterHeader(header,chainlist):
+#
+# split sequence in fasta string into predefined width of string lists
+#
+	filteredHeader = []
+	for line in header:
+		if line[0:6] == "SEQRES":
+			chainid = line[11:12]
+			if chainid in chainlist:
+				filteredHeader.append(line)
+		else:
+				filteredHeader.append(line)
+
+	return(filteredHeader)	
+
+
 def fastaSplit(fasta,width):
 #
 # split sequence in fasta string into predefined width of string lists
@@ -121,21 +137,18 @@ def fastaSplit(fasta,width):
 
 def saveChains(chains,header,includeList,filename):
 
-	f = open("temp.pdb",'w')
-	if header:
-		f.writelines(header)
-	
+	buffer = []
 	includedChain = ''
 	for chain in sorted(includeList.iterkeys()):
 		if includeList[chain]:
-			f.writelines(chains[chain])
+			buffer = buffer+chains[chain]
 			includedChain=includedChain+chain
-	f.close()
 	if len(includedChain)>0:
 		newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
-		os.rename("temp.pdb",newFileName)
+		f=open(newFileName, 'w')
+		f.writelines(filterHeader(header,includedChain.split()))
+		f.writelines(buffer)
 	else:
-		os.remove("temp.pdb")
 		newFileName=''
 
 	return (newFileName)
@@ -179,32 +192,38 @@ class PDBExtract(object):
 			f = open("temp.pdb",'w')
 			if self.header:
 				f.writelines(header)
+			buffer = []
 			includedChain=""
 			if self.extract:
 				chainlist = self.extract.split()
 				for chain in chainlist:
 					if chain in chains:
-						f.writelines(chains[chain])
+						buffer=buffer+chains[chain]
 						includedChain=includedChain+chain
 			if self.exclude:
 				excludelist = self.exclude.split()
 				for chain in chains:
 					if chain in chains and not chain in excludelist:
-						f.writelines(chains[chain])
+						buffer=buffer+chains[chain]
 						includedChain=includedChain+chain
-			f.close()
 			if len(includedChain)>0:
 				newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
-				os.rename("temp.pdb",newFileName)
+				f = open(newFileName,'w')
+				if self.header:
+					filteredHeader = filterHeader(header,includedChain.split())
+					f.writelines(filteredHeader)
+				f.writelines(buffer)
+				f.close
 			else:
-				os.remove("temp.pdb")
+				newFileName = ''
 
 		if self.split:
 			for chain in chains:
 				newFileName =filename[:len(filename)-4]+"_"+chain+".pdb" 
 				f = open(newFileName,'w')
 				if self.header:
-					f.writelines(header)
+					filteredHeader = filterHeader(header,[chain])
+					f.writelines(filteredHeader)
 				f.writelines(chains[chain])
 				f.close()
 
@@ -247,7 +266,7 @@ class PDBExtract(object):
 							includeList[chain]=False
 						if self.excludeseq:
 							includeList[chain]=True
-
+				
 				newFileName = saveChains(chains,header,includeList,filename)
 			else:
 				newFileName=''
@@ -278,8 +297,9 @@ class PDBExtract(object):
 						cutoff = len(sequences[i])*3
 						if cutoff < score:
 							includeList[chainlist[j]] = False
-
 				newFileName = saveChains(chains,header,includeList,filename)
+			else:
+				newFileName=''
 		
 		if (self.hetero or self.filter) and (not self.exclude and not self.unique and not self.extract and not self.split):
 			newFileName = filename[:len(filename)-4]+"_filtered"+".pdb"
