@@ -55,16 +55,18 @@ class Superpose():
 				self.RMSD= float(match.group(1))
 				self.qscore=float(match.group(2))
 				self.aligned=aligned=float(match.group(3))
+				success=True
+			else:
+				success=False
+				return(success)
+
 			data = p_stdout.split("\n")	
-
 			capture = False
-
 
 			for line in data:
 				if line == "|-------------+------------+-------------|":
 					capture = True
-					
-				
+			
 				if line == "`-------------\'------------\'-------------\'":
 					capture = False
 
@@ -75,10 +77,15 @@ class Superpose():
 					queryAmino = line[6:9].strip()
 					queryAminoNum = line[9:13].strip()
 					queryDistance = line[19:23].strip()
-					subjectSecondary = line[28:29].strip()
-					subjectChain=line[31:32].strip()
-					subjectAmino=line[33:36].strip()
-					subjectAminoNum=line[37:40].strip()
+					if line[32:33]=="|":
+						a = 5
+					else:
+						a = 0
+					subjectSecondary = line[28+a:29+a].strip()
+					subjectChain=line[31+a:32+a].strip()
+					subjectAmino=line[33+a:36+a].strip()
+					subjectAminoNum=line[37+a:40+a].strip()
+					
 					query = False
 					subject = False
 					if len(querySecondary)+len(queryChain)+len(queryAmino)+len(queryAminoNum)>0:
@@ -97,12 +104,12 @@ class Superpose():
 					if len(queryDistance):
 						queryresidue.distance = float(queryDistance)
 						subjectresidue.distance = float(queryDistance)
-						
+
 					queryresidue.alignid = subjectresidue
 					subjectresidue.alignid = queryresidue
 					self.queryalign.append(queryresidue)
 					self.subjectalign.append(subjectresidue)
-					
+			return(success)
 
 					
 					
@@ -253,54 +260,24 @@ def main(argument):
 						if (onePdb != pdb) :
 							print "Processing {0}".format(onePdb)
 							superposedFilename = pdb[:len(pdb)-4]+'_'+onePdb
-							#
-							# run superpose using subprocess. superpose should be in your PATH.
-							#
-							p = subprocess.Popen(['superpose',onePdb,pdb,superposedFilename],
-												  stdout=subprocess.PIPE)
-							#
-							# stdout from superpose will be saved into p_stdout
-							#
-							p_stdout = p.stdout.read()
-							fw = open(superposedFilename[:len(superposedFilename)-4]+'.out','w')
-							fw.write(p_stdout)
-							fw.close()
-							#
-							# regex for the parsing output from superpose
-							# RMSD, Q, Transformation matrix and vector will be parsed out.
-							
-							regex = re.compile(" at RMSD =\s+([\d.]+),\s+Q=\s+([\d.]+)\s+and alignment length\s+([\d.]+)")
-							regex2 = re.compile("Rx         Ry         Rz           T\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+")
-							match = regex.search(p_stdout)
 
-							if match:
-								RMSD= float(match.group(1))
-								Q=float(match.group(2))
-								aligned=float(match.group(3))
-								RMSDDic[superposedFilename] = RMSD
-								QDic[superposedFilename] = Q
-								alignedDic[superposedFilename] = aligned
-								tableSubjectDescriptions[superposedFilename]=pdbparsing(superposedFilename, '^TITLE    [ \d](.*)$')		
+							sup = Superpose(queryPDB=pdb, subjectPDB=onePdb, superposedPDB=superposedFilename)
+							if sup.run():
+						
+								RMSDDic[superposedFilename] = sup.RMSD
+								QDic[superposedFilename] = sup.qscore
+								alignedDic[superposedFilename] = sup.aligned
+								tableSubjectDescriptions[superposedFilename]=pdbparsing(superposedFilename, '^TITLE    [ \d](.*)$')
+								pdbLoadList.append(superposedFilename)	
 							else:
-								RMSD= 99
-								Q=0
-								aligned=0
-								RMSDDic[superposedFilename] = RMSD
-								QDic[superposedFilename] = Q
-								alignedDic[superposedFilename] = aligned
+								RMSDDic[superposedFilename] = 99
+								QDic[superposedFilename] = 0
+								alignedDic[superposedFilename] = 0
 								tableSubjectDescriptions[superposedFilename]='Alignment Failed'
 								
 							tablelist = {}
-							match2 = regex2.search(p_stdout)
-							if match2:
-								matrix=[[float(match2.group(1)),float(match2.group(2)),float(match2.group(3))],
-										[float(match2.group(5)),float(match2.group(6)),float(match2.group(7))],
-										[float(match2.group(9)),float(match2.group(10)),float(match2.group(11))]]
-								vector=[float(match2.group(4)),float(match2.group(5)),float(match2.group(6))]
-							
-							informationFile.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\n".format(pdb, onePdb, superposedFilename,RMSD,Q,aligned))
-							if match:
-								pdbLoadList.append(superposedFilename)
+							informationFile.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\n".format(pdb, onePdb, superposedFilename,sup.RMSD,sup.qscore,sup.aligned))
+								
 				
 				informationFile.close() 
 				pymolloadingFile.write("bg_color white\n")
@@ -309,8 +286,7 @@ def main(argument):
 				renderingSubjectDescriptions={}
 
 				for singlepdb in pdbLoadList:
-					write = True
-					
+					write = True				
 					if (argument.score and (QDic[singlepdb]>=float(argument.score))):
 						print "{0} is skipped. Q Score:{1}".format(singlepdb, RMSDDic[singlepdb])
 						write = False	
