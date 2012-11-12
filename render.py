@@ -47,7 +47,6 @@ def htmlout(description):
 			<p>{2}</p>
 			<p>Resolution:{3}</p>
 			<p>Authors:{4}</p>
-
 			</div>
 			</td>
 		</tr>

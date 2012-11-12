@@ -6,6 +6,106 @@
 
 import sys, subprocess, re, os, glob, argparse
 
+class Aligned():
+	def __init__(self, **kwargs):
+		self.pdb = kwargs.get('pdb')
+		self.chain = kwargs.get('chain')
+		self.number = kwargs.get('number')
+		self.aa = kwargs.get('aa')
+		self.distance = kwargs.get('distance')
+		self.aligned = kwargs.get('aligned')
+		if self.chain and self.number and self.aa:
+			self.id = self.chain+"_"+str(self.number)+"_"+self.aa
+		else:
+			self.id = None
+		self.alignid = None
+		self.gap = kwargs.get('gap')
+		self.outfile = ""
+
+class Superpose():
+
+	def __init__(self, **kwargs):
+		self.queryPDB=kwargs.get('queryPDB')
+		self.subjectPDB = kwargs.get('subjectPDB')
+		self.superposedPDB=kwargs.get('superposedPDB')
+		self.outfile = ""
+		self.RMSD = 0
+		self.aligned = 0
+		self.qscore = 0	
+		self.queryalign = []
+		self.subjectalign = []
+
+	def run(self):
+		if os.path.exists(self.queryPDB) and os.path.exists(self.subjectPDB):
+			p = subprocess.Popen(['superpose',self.queryPDB,self.subjectPDB,self.superposedPDB],
+											  stdout=subprocess.PIPE)
+						#
+						# stdout from superpose will be saved into p_stdout
+						#
+			p_stdout = p.stdout.read()
+			self.outfile = self.superposedPDB[:len(self.superposedPDB)-4]+'.out'
+			fw = open(self.outfile,'w')
+			fw.write(p_stdout)
+			fw.close()
+	
+			regex = re.compile(" at RMSD =\s+([\d.]+),\s+Q=\s+([\d.]+)\s+and alignment length\s+([\d.]+)")
+			
+			match = regex.search(p_stdout)
+			if match:
+				self.RMSD= float(match.group(1))
+				self.qscore=float(match.group(2))
+				self.aligned=aligned=float(match.group(3))
+			data = p_stdout.split("\n")	
+
+			capture = False
+
+
+			for line in data:
+				if line == "|-------------+------------+-------------|":
+					capture = True
+					
+				
+				if line == "`-------------\'------------\'-------------\'":
+					capture = False
+
+				if capture and line !="|-------------+------------+-------------|":
+
+					querySecondary = line[1:2].strip()
+					queryChain = line[4:5].strip()
+					queryAmino = line[6:9].strip()
+					queryAminoNum = line[9:13].strip()
+					queryDistance = line[19:23].strip()
+					subjectSecondary = line[28:29].strip()
+					subjectChain=line[31:32].strip()
+					subjectAmino=line[33:36].strip()
+					subjectAminoNum=line[37:40].strip()
+					query = False
+					subject = False
+					if len(querySecondary)+len(queryChain)+len(queryAmino)+len(queryAminoNum)>0:
+						queryresidue = Aligned(pdb=self.queryPDB, chain=queryChain, aa=queryAmino, number=int(queryAminoNum),gap=False )
+						query = True
+					else:
+						queryresidue = Aligned(pdb=self.queryPDB,gap=True)
+
+
+					if len(subjectSecondary)+len(subjectChain)+len(subjectAmino)+len(subjectAminoNum)>0:
+						subjectresidue = Aligned(pdb=self.subjectPDB, chain=subjectChain, aa=subjectAmino, number=int(subjectAminoNum),gap=False)
+						subject = True
+					else:
+						subjectresidue = Aligned(pdb=self.subjectPDB,gap=True)
+					
+					if len(queryDistance):
+						queryresidue.distance = float(queryDistance)
+						subjectresidue.distance = float(queryDistance)
+						
+					queryresidue.alignid = subjectresidue
+					subjectresidue.alignid = queryresidue
+					self.queryalign.append(queryresidue)
+					self.subjectalign.append(subjectresidue)
+					
+
+					
+					
 
 def pdbparsing(filename, regex):
 #
