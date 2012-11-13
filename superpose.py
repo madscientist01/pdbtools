@@ -1,12 +1,16 @@
 #!/usr/bin/python
 #
 # Wrapper of Superpose (CCP4)
+# Written by MadScientist (http://madscientist.wordpress.com)
 #
 #
 
 import sys, subprocess, re, os, glob, argparse
 
 class Aligned():
+#
+# Storage class for the structural alignment in Superpose output file
+#
 	def __init__(self, **kwargs):
 		self.pdb = kwargs.get('pdb')
 		self.chain = kwargs.get('chain')
@@ -32,10 +36,93 @@ class Superpose():
 		self.RMSD = 0
 		self.aligned = 0
 		self.qscore = 0	
-		self.queryalign = []
-		self.subjectalign = []
+		self.queryAlign = []
+		self.subjectAlign = []
+	
+
+	def fastaSplit(self,fasta,width):
+	#
+	# Split sequence in fasta string into predefined width of string lists
+	#
+		cursor = 0
+		end = 0
+		buffer = []
+		while (cursor <len(fasta)):
+			if (len(fasta)-cursor) > width:
+				end+=width
+			else:
+				end=len(fasta)		
+			buffer.append(fasta[cursor:end]+"\n")
+			cursor+=width
+		return(buffer)	
+
+	def FASTAoutput(self):
+	#
+	# Generate structural alignment as FASTA formats
+	#
+		fasta = []
+		querySeq, qmatch = self.generateAlign(self.queryAlign)
+		subjectSeq, smatch = self.generateAlign(self.subjectAlign)
+		for key,val in querySeq.iteritems():
+			if qmatch[key]>0:
+				fasta.append(">{0}_{1}".format(self.queryPDB[:len(self.queryPDB)-4],key))
+				fasta=fasta+self.fastaSplit(val,60)
+		for key,val in subjectSeq.iteritems():
+			if smatch[key]>0:
+				fasta.append(">{0}_{1}".format(self.subjectPDB[:len(self.subjectPDB)-4],key))
+				fasta=fasta+self.fastaSplit(val,60)
+		return(fasta)
+
+	def queryaligned(self):
+		sequences, match = self.generateAlign(self.queryAlign)
+		return sequences,match
+
+	def subjectaligned(self):
+		sequences,matc
+		h = self.generateAlign(self.subjectAlign)
+		return sequences,match
+
+
+	def generateAlign(self,sequenceDic):
+		oneLetter ={'VAL':'V', 'ILE':'I', 'LEU':'L', 'GLU':'E', 'GLN':'Q', \
+					'ASP':'D', 'ASN':'N', 'HIS':'H', 'TRP':'W', 'PHE':'F', 'TYR':'Y',    \
+					'ARG':'R', 'LYS':'K', 'SER':'S', 'THR':'T', 'MET':'M', 'ALA':'A',    \
+					'GLY':'G', 'PRO':'P', 'CYS':'C', 'MSE':'M'}
+		sequence = ""
+		sequences={}
+		chain = ""
+		matched={}
+		for residue in sequenceDic:
+			
+			if chain and residue.chain and chain !=residue.chain:
+				sequences[chain]=sequence
+				sequence = ""
+				chain = residue.chain
+				matched[chain]=0
+				
+			if not chain and residue.chain:
+				chain = residue.chain
+				matched[chain]=0
+				
+			if residue.gap:
+				sequence = sequence+"-"
+			else:
+				if residue.aa in oneLetter:
+					sequence = sequence+oneLetter[residue.aa]
+				else:
+					sequence = sequence+"X"
+				if residue.distance:
+					matched[residue.chain]+=1
+				
+		if chain:
+			sequences[chain] = sequence
+
+		return sequences,matched 	
 
 	def run(self):
+	#
+	#
+	#
 		if os.path.exists(self.queryPDB) and os.path.exists(self.subjectPDB):
 			p = subprocess.Popen(['superpose',self.queryPDB,self.subjectPDB,self.superposedPDB],
 											  stdout=subprocess.PIPE)
@@ -94,7 +181,6 @@ class Superpose():
 					else:
 						queryresidue = Aligned(pdb=self.queryPDB,gap=True)
 
-
 					if len(subjectSecondary)+len(subjectChain)+len(subjectAmino)+len(subjectAminoNum)>0:
 						subjectresidue = Aligned(pdb=self.subjectPDB, chain=subjectChain, aa=subjectAmino, number=int(subjectAminoNum),gap=False)
 						subject = True
@@ -107,12 +193,9 @@ class Superpose():
 
 					queryresidue.alignid = subjectresidue
 					subjectresidue.alignid = queryresidue
-					self.queryalign.append(queryresidue)
-					self.subjectalign.append(subjectresidue)
-			return(success)
-
-					
-					
+					self.queryAlign.append(queryresidue)
+					self.subjectAlign.append(subjectresidue)
+			return(success)				
 
 def pdbparsing(filename, regex):
 #
