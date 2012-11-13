@@ -61,18 +61,13 @@ class Superpose():
 	# Generate structural alignment as FASTA formats
 	#
 		fasta = []
-		querySeq, qmatch = self.generateAlign(self.queryAlign)
-		subjectSeq, smatch = self.generateAlign(self.subjectAlign)
-		for key,val in querySeq.iteritems():
-			if qmatch[key]>0:
-				fasta.append(">{0}_{1}\n".format(self.queryPDB[:len(self.queryPDB)-4],key))
-				fasta=fasta+self.fastaSplit(val,60)
-		for key,val in subjectSeq.iteritems():
-			if smatch[key]>0:
-				fasta.append(">{0}_{1}\n".format(self.subjectPDB[:len(self.subjectPDB)-4],key))
-				fasta=fasta+self.fastaSplit(val,60)
+		query, subject = self.generateAlignment()
+		fasta.append(">{0}\n".format(self.queryPDB[:len(self.queryPDB)-4]))
+		fasta=fasta+self.fastaSplit(query,60)
+		fasta.append(">{0}\n".format(self.subjectPDB[:len(self.subjectPDB)-4]))
+		fasta=fasta+self.fastaSplit(subject,60)
 		return(fasta)
-
+		
 	def queryaligned(self):
 		sequences, match = self.generateAlign(self.queryAlign)
 		return sequences,match
@@ -82,60 +77,61 @@ class Superpose():
 		h = self.generateAlign(self.subjectAlign)
 		return sequences,match
 
-
-	def generateAlign(self,sequenceDic):
+	def generateAlignment(self):
 		oneLetter ={'VAL':'V', 'ILE':'I', 'LEU':'L', 'GLU':'E', 'GLN':'Q', \
 					'ASP':'D', 'ASN':'N', 'HIS':'H', 'TRP':'W', 'PHE':'F', 'TYR':'Y',    \
 					'ARG':'R', 'LYS':'K', 'SER':'S', 'THR':'T', 'MET':'M', 'ALA':'A',    \
-					'GLY':'G', 'PRO':'P', 'CYS':'C', 'MSE':'M'}
+					'GLY':'G', 'PRO':'P', 'CYS':'C', 'MSE':'M', '-':'-'}
 		sequence = ""
-		sequences={}
-		chain = ""
-		matched={}
-		for residue in sequenceDic:
-			
-			if chain and residue.chain and chain !=residue.chain:
-				sequences[chain]=sequence
-				sequence = ""
-				chain = residue.chain
-				matched[chain]=0
-				
-			if not chain and residue.chain:
-				chain = residue.chain
-				matched[chain]=0
-				
-			if residue.gap:
-				sequence = sequence+"-"
+		aligned = ""
+
+		for i in range(0,len(self.queryAlign)-1):
+			residue = self.queryAlign[i]
+		
+			if residue.aa in oneLetter:
+				sequence = sequence+oneLetter[residue.aa]
 			else:
-				if residue.aa in oneLetter:
-					sequence = sequence+oneLetter[residue.aa]
-				else:
-					sequence = sequence+"X"
-				if residue.distance:
-					matched[residue.chain]+=1				
-		if chain:
-			sequences[chain] = sequence
-		return sequences,matched 	
+				sequence = sequence+"X"
+			if residue.alignid.aa in oneLetter:
+				aligned = aligned+oneLetter[residue.alignid.aa]
+			else:
+				aligned = aligned+"X"
+
+		uTrim = 0
+		lTrim = len(sequence)-1
+		for i in range(len(sequence)-1):
+			if self.queryAlign[i].distance:
+				uTrim = i
+				break
+
+		for i in reversed(range(len(sequence)-1)):
+			if self.queryAlign[i].distance:	 
+				lTrim = i+1
+				break
+		
+		return sequence[uTrim:lTrim],aligned[uTrim:lTrim]
 
 	def run(self):
 	#
-	#
+	# Run superpose with two PDB file (self.queryPDB and self.subjectPDB)
 	#
 		if os.path.exists(self.queryPDB) and os.path.exists(self.subjectPDB):
 			p = subprocess.Popen(['superpose',self.queryPDB,self.subjectPDB,self.superposedPDB],
 											  stdout=subprocess.PIPE)
-						#
-						# stdout from superpose will be saved into p_stdout
-						#
+	#
+	# stdout from superpose will be saved into p_stdout
+	#
 			p_stdout = p.stdout.read()
 			self.outfile = self.superposedPDB[:len(self.superposedPDB)-4]+'.out'
 			fw = open(self.outfile,'w')
 			fw.write(p_stdout)
 			fw.close()
-	
+	#
+	# Parsing output file. RMSD, Q-score, # of aligned residues are parsed using regex
+	#
 			regex = re.compile(" at RMSD =\s+([\d.]+),\s+Q=\s+([\d.]+)\s+and alignment length\s+([\d.]+)")
-			
 			match = regex.search(p_stdout)
+			
 			if match:
 				self.RMSD= float(match.group(1))
 				self.qscore=float(match.group(2))
@@ -144,7 +140,9 @@ class Superpose():
 			else:
 				success=False
 				return(success)
-
+	#
+	# Parsing sequence alignment 
+	#			
 			data = p_stdout.split("\n")	
 			capture = False
 
@@ -177,13 +175,13 @@ class Superpose():
 						queryresidue = Aligned(pdb=self.queryPDB, chain=queryChain, aa=queryAmino, number=int(queryAminoNum),gap=False )
 						query = True
 					else:
-						queryresidue = Aligned(pdb=self.queryPDB,gap=True)
+						queryresidue = Aligned(pdb=self.queryPDB,aa="-",gap=True)
 
 					if len(subjectSecondary)+len(subjectChain)+len(subjectAmino)+len(subjectAminoNum)>0:
 						subjectresidue = Aligned(pdb=self.subjectPDB, chain=subjectChain, aa=subjectAmino, number=int(subjectAminoNum),gap=False)
 						subject = True
 					else:
-						subjectresidue = Aligned(pdb=self.subjectPDB,gap=True)
+						subjectresidue = Aligned(pdb=self.subjectPDB,aa="-", gap=True)
 					
 					if len(queryDistance):
 						queryresidue.distance = float(queryDistance)
@@ -373,7 +371,6 @@ def main(argument):
 
 				for singlepdb in pdbLoadList:
 					write = True
-					print argument.rmsd				
 					if (argument.score and (QDic[singlepdb]>=float(argument.score))):
 						print "{0} is skipped. Q Score:{1}".format(singlepdb, RMSDDic[singlepdb])
 						write = False	
