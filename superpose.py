@@ -65,11 +65,11 @@ class Superpose():
 		subjectSeq, smatch = self.generateAlign(self.subjectAlign)
 		for key,val in querySeq.iteritems():
 			if qmatch[key]>0:
-				fasta.append(">{0}_{1}".format(self.queryPDB[:len(self.queryPDB)-4],key))
+				fasta.append(">{0}_{1}\n".format(self.queryPDB[:len(self.queryPDB)-4],key))
 				fasta=fasta+self.fastaSplit(val,60)
 		for key,val in subjectSeq.iteritems():
 			if smatch[key]>0:
-				fasta.append(">{0}_{1}".format(self.subjectPDB[:len(self.subjectPDB)-4],key))
+				fasta.append(">{0}_{1}\n".format(self.subjectPDB[:len(self.subjectPDB)-4],key))
 				fasta=fasta+self.fastaSplit(val,60)
 		return(fasta)
 
@@ -112,11 +112,9 @@ class Superpose():
 				else:
 					sequence = sequence+"X"
 				if residue.distance:
-					matched[residue.chain]+=1
-				
+					matched[residue.chain]+=1				
 		if chain:
 			sequences[chain] = sequence
-
 		return sequences,matched 	
 
 	def run(self):
@@ -345,13 +343,18 @@ def main(argument):
 							superposedFilename = pdb[:len(pdb)-4]+'_'+onePdb
 
 							sup = Superpose(queryPDB=pdb, subjectPDB=onePdb, superposedPDB=superposedFilename)
-							if sup.run():
-						
+							if sup.run():				
 								RMSDDic[superposedFilename] = sup.RMSD
 								QDic[superposedFilename] = sup.qscore
 								alignedDic[superposedFilename] = sup.aligned
 								tableSubjectDescriptions[superposedFilename]=pdbparsing(superposedFilename, '^TITLE    [ \d](.*)$')
-								pdbLoadList.append(superposedFilename)	
+								pdbLoadList.append(superposedFilename)
+								if argument.stalign:
+									aligned = sup.FASTAoutput()
+									if aligned:
+										f = open(superposedFilename[:len(superposedFilename)-4]+".fasta","w")
+										f.writelines(aligned)
+
 							else:
 								RMSDDic[superposedFilename] = 99
 								QDic[superposedFilename] = 0
@@ -369,17 +372,18 @@ def main(argument):
 				renderingSubjectDescriptions={}
 
 				for singlepdb in pdbLoadList:
-					write = True				
+					write = True
+					print argument.rmsd				
 					if (argument.score and (QDic[singlepdb]>=float(argument.score))):
 						print "{0} is skipped. Q Score:{1}".format(singlepdb, RMSDDic[singlepdb])
 						write = False	
 
 					if  (argument.rmsd and (RMSDDic[singlepdb]>=float(argument.rmsd))):
-						print "{0} is skipped. RMSD:{1}".format(singlepdb, RMSDDic[singlepdb])
+						print "{0} is skipped. RMSD:{1}".format(singlepdb, QDic[singlepdb])
 						write = False
 
-					if (argument.align and (alignDic[singlepdb]>=float(argument.align))):
-						print "{0} is skipped. RMSD:{1}".format(singlepdb, RMSDDic[singlepdb])
+					if (argument.align and (alignedDic[singlepdb]>=float(argument.align))):
+						print "{0} is skipped. Align:{1}".format(singlepdb, alignedDic[singlepdb])
 						write = False
 
 					if write:
@@ -433,6 +437,8 @@ if __name__ == "__main__":
 						help='Render 1:1 comparison')
 	parser.add_argument('-p', '--pymol', action='store_true', dest='render', default=False,
 						help='Execute PyMOL')
+	parser.add_argument('-n', '--align', action='store_true', dest='stalign', default=False,
+						help='Save structure based sequence alignment')
 	parser.add_argument('-v', '--fixed_view', action='store', dest='view',
 						help='Filename which contains set_view command of PyMOL')
 

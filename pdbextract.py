@@ -139,7 +139,7 @@ def saveChains(chains,header,includeList,filename):
 
 	buffer = []
 	includedChain = ''
-	for chain in sorted(includeList.iterkeys()):
+	for chain in sorted(includeList.Í):
 		if includeList[chain]:
 			buffer = buffer+chains[chain]
 			includedChain=includedChain+chain

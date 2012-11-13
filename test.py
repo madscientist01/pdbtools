@@ -13,7 +13,6 @@ if __name__ == "__main__":
 	sup.run()
 	print sup.RMSD, sup.qscore, sup.aligned
 	fasta = sup.FASTAoutput()
-
-	for line in fasta:
-		print line
-	
+	f = open ('1ATN.fasta','w')
+	f.writelines(fasta)
+	f.close()
