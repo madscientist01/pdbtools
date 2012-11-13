@@ -1,7 +1,6 @@
 #!/usr/bin/python
 #
-# Wrapper of Superpose (CCP4)
-#
+#  Test for the Superpose.py
 #
 
 from superpose import *
