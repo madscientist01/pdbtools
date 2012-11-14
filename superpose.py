@@ -61,12 +61,12 @@ class Superpose():
 	# Generate structural alignment as FASTA formats
 	#
 		fasta = []
-		query, subject,utrim,ltrim = self.generateAlignment()
+		query, subject = self.generateAlignment()
 		
-		fasta.append(">{0}:{1}\n".format(self.queryPDB[:len(self.queryPDB)-4]))
+		fasta.append(">{0}\n".format(self.queryPDB[:len(self.queryPDB)-4]))
 		fasta=fasta+self.fastaSplit(query,60)
 		
-		fasta.append(">{0}:{1}\n".format(self.subjectPDB[:len(self.subjectPDB)-4]))
+		fasta.append(">{0}\n".format(self.subjectPDB[:len(self.subjectPDB)-4]))
 		fasta=fasta+self.fastaSplit(subject,60)
 		return(fasta)
 		
@@ -102,7 +102,7 @@ class Superpose():
 			if self.queryAlign[i].distance:	 
 				lTrim = i+1
 				break
-		
+		print self.queryAlign[uTrim].chain, self.queryAlign[uTrim].number, "-", self.queryAlign[lTrim-1].chain,self.queryAlign[lTrim-1].number
 		return sequence[uTrim:lTrim],aligned[uTrim:lTrim]
 
 	def run(self):
