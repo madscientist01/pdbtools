@@ -38,6 +38,10 @@ class Superpose():
 		self.qscore = 0	
 		self.queryAlign = []
 		self.subjectAlign = []
+		self.querySeq = ""
+		self.subjectSeq = ""
+		self.upper = 0
+		self.lower = 0
 	
 
 	def fastaSplit(self,fasta,width):
@@ -60,14 +64,21 @@ class Superpose():
 	#
 	# Generate structural alignment as FASTA formats
 	#
-		fasta = []
-		query, subject,utrim,ltrim = self.generateAlignment()
-		
-		fasta.append(">{0}:{1}\n".format(self.queryPDB[:len(self.queryPDB)-4]))
-		fasta=fasta+self.fastaSplit(query,60)
-		
-		fasta.append(">{0}:{1}\n".format(self.subjectPDB[:len(self.subjectPDB)-4]))
-		fasta=fasta+self.fastaSplit(subject,60)
+		fasta = []	
+		queryHeader = (self.queryAlign[self.upper].chain+":"+
+					   str(self.queryAlign[self.upper].number)+"-"+
+					   self.queryAlign[self.lower].chain+":"+
+					   str(self.queryAlign[self.lower].number))
+
+		fasta.append(">{0}:{1}\n".format(self.queryPDB[:len(self.queryPDB)-4],queryHeader))
+		fasta=fasta+self.fastaSplit(self.querySeq,60)
+		subjectHeader=	(self.subjectAlign[self.upper].chain+":"+
+						 str(self.subjectAlign[self.upper].number)+"-"+
+						 self.subjectAlign[self.lower].chain+":"+
+						 str(self.subjectAlign[self.lower].number))
+
+		fasta.append(">{0}:{1}\n".format(self.subjectPDB[:len(self.subjectPDB)-4],subjectHeader))
+		fasta=fasta+self.fastaSplit(self.subjectSeq,60)
 		return(fasta)
 		
 
@@ -100,11 +111,14 @@ class Superpose():
 
 		for i in reversed(range(len(sequence)-1)):
 			if self.queryAlign[i].distance:	 
-				lTrim = i+1
+				lTrim = i
 				break
-		
-		return sequence[uTrim:lTrim],aligned[uTrim:lTrim]
+		self.querySeq=sequence[uTrim:lTrim+1]
+		self.subjectSeq=aligned[uTrim:lTrim+1]
+		self.upper = uTrim
+		self.lower = lTrim
 
+		return 
 	def run(self):
 	#
 	# Run superpose with two PDB file (self.queryPDB and self.subjectPDB)
@@ -166,13 +180,15 @@ class Superpose():
 					query = False
 					subject = False
 					if len(querySecondary)+len(queryChain)+len(queryAmino)+len(queryAminoNum)>0:
-						queryresidue = Aligned(pdb=self.queryPDB, chain=queryChain, aa=queryAmino, number=int(queryAminoNum),gap=False )
+						queryresidue = Aligned(pdb=self.queryPDB, chain=queryChain, aa=queryAmino,
+											   number=int(queryAminoNum),gap=False)
 						query = True
 					else:
 						queryresidue = Aligned(pdb=self.queryPDB,aa="-",gap=True)
 
 					if len(subjectSecondary)+len(subjectChain)+len(subjectAmino)+len(subjectAminoNum)>0:
-						subjectresidue = Aligned(pdb=self.subjectPDB, chain=subjectChain, aa=subjectAmino, number=int(subjectAminoNum),gap=False)
+						subjectresidue = Aligned(pdb=self.subjectPDB, chain=subjectChain, 
+												 aa=subjectAmino,number=int(subjectAminoNum),gap=False)
 						subject = True
 					else:
 						subjectresidue = Aligned(pdb=self.subjectPDB,aa="-", gap=True)
@@ -185,6 +201,8 @@ class Superpose():
 					subjectresidue.alignid = queryresidue
 					self.queryAlign.append(queryresidue)
 					self.subjectAlign.append(subjectresidue)
+
+			self.generateAlignment()
 			return(success)				
 
 def pdbparsing(filename, regex):
@@ -212,7 +230,8 @@ def pdbparsing(filename, regex):
 
 
 
-def htmlout(queryid, queryDescription, renderingSubjectDescriptions,tableSubjectDescriptions,rmsd,qscore,align,filename):
+def htmlout(queryid, queryDescription, renderingSubjectDescriptions,tableSubjectDescriptions,
+		    rmsd,qscore,align,filename):
 #
 # Generate render.html which display rendered png files
 #
@@ -286,7 +305,8 @@ def htmlout(queryid, queryDescription, renderingSubjectDescriptions,tableSubject
 		if match:
 			query = match.group(1)
 			subject = match.group(2)
-		htmloutput.write(imgtag.format(pdb[:-4]+".png", query,queryDescription,subject,desc,rmsd[pdb],qscore[pdb],align[pdb]))
+		htmloutput.write(imgtag.format(pdb[:-4]+".png", query,queryDescription,subject,desc,
+			             rmsd[pdb],qscore[pdb],align[pdb]))
 
 	for pdb,desc in tableSubjectDescriptions.items():
 		match = re.match("(\S+)_(\S+).pdb",pdb)
@@ -296,7 +316,8 @@ def htmlout(queryid, queryDescription, renderingSubjectDescriptions,tableSubject
 		if desc == 'Alignment Failed':
 			table = table+tableContent.format(query,queryDescription,subject,desc,'None','None','None')
 		else:
-			table = table+tableContent.format(query,queryDescription,subject,desc,rmsd[pdb],qscore[pdb],align[pdb])
+			table = table+tableContent.format(query,queryDescription,subject,desc,
+											  rmsd[pdb],qscore[pdb],align[pdb])
 	htmloutput.write(table+"</table>\n")
 	htmloutput.write(htmlfooter)
 	htmloutput.close()
@@ -334,12 +355,14 @@ def main(argument):
 							print "Processing {0}".format(onePdb)
 							superposedFilename = pdb[:len(pdb)-4]+'_'+onePdb
 
-							sup = Superpose(queryPDB=onePdb, subjectPDB=pdb, superposedPDB=superposedFilename)
+							sup = Superpose(queryPDB=onePdb, subjectPDB=pdb, 
+											superposedPDB=superposedFilename)
 							if sup.run():				
 								RMSDDic[superposedFilename] = sup.RMSD
 								QDic[superposedFilename] = sup.qscore
 								alignedDic[superposedFilename] = sup.aligned
-								tableSubjectDescriptions[superposedFilename]=pdbparsing(superposedFilename, '^TITLE    [ \d](.*)$')
+								tableSubjectDescriptions[superposedFilename]=pdbparsing(superposedFilename, 
+																						'^TITLE    [ \d](.*)$')
 								pdbLoadList.append(superposedFilename)
 								if argument.stalign:
 									aligned = sup.FASTAoutput()
@@ -355,7 +378,9 @@ def main(argument):
 								tableSubjectDescriptions[superposedFilename]='Alignment Failed'
 								
 							tablelist = {}
-							informationFile.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\n".format(pdb, onePdb, superposedFilename,sup.RMSD,sup.qscore,sup.aligned))
+							informationFile.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\n"
+												  .format(pdb, onePdb, superposedFilename,sup.RMSD,
+												  		  sup.qscore,sup.aligned))
 								
 				
 				informationFile.close() 
@@ -407,12 +432,11 @@ def main(argument):
 										  stdout=subprocess.PIPE)
 					p_stdout = p.stdout.read()
 				if argument.stepwise:
-					htmlout(pdb,pdbparsing(pdb, '^TITLE    [ \d](.*)$'),renderingSubjectDescriptions,tableSubjectDescriptions,RMSDDic,QDic,alignedDic,pdb+'.html')
+					htmlout(pdb,pdbparsing(pdb, '^TITLE    [ \d](.*)$'),renderingSubjectDescriptions,
+										   tableSubjectDescriptions,RMSDDic,QDic,alignedDic,pdb+'.html')
 			else:
 				print "File is not exist!"
-
 		sys.exit()		
-
 
 if __name__ == "__main__":
 
