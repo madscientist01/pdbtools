@@ -61,21 +61,15 @@ class Superpose():
 	# Generate structural alignment as FASTA formats
 	#
 		fasta = []
-		query, subject = self.generateAlignment()
-		fasta.append(">{0}\n".format(self.queryPDB[:len(self.queryPDB)-4]))
+		query, subject,utrim,ltrim = self.generateAlignment()
+		
+		fasta.append(">{0}:{1}\n".format(self.queryPDB[:len(self.queryPDB)-4]))
 		fasta=fasta+self.fastaSplit(query,60)
-		fasta.append(">{0}\n".format(self.subjectPDB[:len(self.subjectPDB)-4]))
+		
+		fasta.append(">{0}:{1}\n".format(self.subjectPDB[:len(self.subjectPDB)-4]))
 		fasta=fasta+self.fastaSplit(subject,60)
 		return(fasta)
 		
-	def queryaligned(self):
-		sequences, match = self.generateAlign(self.queryAlign)
-		return sequences,match
-
-	def subjectaligned(self):
-		sequences,matc
-		h = self.generateAlign(self.subjectAlign)
-		return sequences,match
 
 	def generateAlignment(self):
 		oneLetter ={'VAL':'V', 'ILE':'I', 'LEU':'L', 'GLU':'E', 'GLN':'Q', \
@@ -340,7 +334,7 @@ def main(argument):
 							print "Processing {0}".format(onePdb)
 							superposedFilename = pdb[:len(pdb)-4]+'_'+onePdb
 
-							sup = Superpose(queryPDB=pdb, subjectPDB=onePdb, superposedPDB=superposedFilename)
+							sup = Superpose(queryPDB=onePdb, subjectPDB=pdb, superposedPDB=superposedFilename)
 							if sup.run():				
 								RMSDDic[superposedFilename] = sup.RMSD
 								QDic[superposedFilename] = sup.qscore
@@ -352,6 +346,7 @@ def main(argument):
 									if aligned:
 										f = open(superposedFilename[:len(superposedFilename)-4]+".fasta","w")
 										f.writelines(aligned)
+										f.close()
 
 							else:
 								RMSDDic[superposedFilename] = 99

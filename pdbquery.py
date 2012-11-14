@@ -39,6 +39,13 @@ def generateQuery(parsing_results) :
 
 	keywordQuery= """
 				<orgPdbQuery>
+					<queryType>org.pdb.query.simple.AdvancedKeywordQuery</queryType>
+					<keywords>{0}</keywords>
+				</orgPdbQuery>
+	"""
+
+	descriptionQuery= """
+				<orgPdbQuery>
 					<queryType>org.pdb.query.simple.StructDescQuery</queryType>
 					<entity.pdbx_description.comparator>{1}</entity.pdbx_description.comparator>
 					<entity.pdbx_description.value>{0}</entity.pdbx_description.value>
@@ -115,7 +122,10 @@ def generateQuery(parsing_results) :
 		query = query+queryRefinementHead.format(refinementLevel)+BLASTQuery.format(sequence, results.evalue)+queryRefinementEnd
 		refinementLevel+=1
 	if results.keyword:
-		query = query+queryRefinementHead.format(refinementLevel)+keywordQuery.format(results.keyword, results.keyword_comparator)+queryRefinementEnd
+		query = query+queryRefinementHead.format(refinementLevel)+keywordQuery.format(results.keyword)+queryRefinementEnd
+		refinementLevel+=1
+	if results.description:
+		query = query+queryRefinementHead.format(refinementLevel)+descriptionQuery.format(results.description, results.description_comparator)+queryRefinementEnd
 		refinementLevel+=1
 	if results.resolution:
 		query = query+queryRefinementHead.format(refinementLevel)+resolutionQuery.format(results.resolution)+queryRefinementEnd
@@ -224,6 +234,8 @@ if __name__ == "__main__":
 	parser.add_argument('-be', action='store', dest='evalue',default=1e-10,
 	                    help='e-value cutoff of BLAST search')
 	parser.add_argument('-k', action='store', dest='keyword',
+	                    help='search pdb based on keywords ')
+	parser.add_argument('-de', action='store', dest='description',
 	                    help='search pdb based on keywords ')
 	parser.add_argument('-c', action='store', dest='keyword_comparator',default='contains',
 	                    help='search pdb does not contain keywords')

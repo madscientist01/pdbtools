@@ -10,7 +10,7 @@
 #
 
 import sys, subprocess, re, os, glob, argparse
-import warnings
+from shutil import copy
 from Bio import pairwise2
 from Bio.SubsMat import MatrixInfo as matlist
 
@@ -135,30 +135,13 @@ def fastaSplit(fasta,width):
 	return(buffer)	
 
 
-def saveChains(chains,header,includeList,filename):
-
-	buffer = []
-	includedChain = ''
-	for chain in sorted(includeList.Í):
-		if includeList[chain]:
-			buffer = buffer+chains[chain]
-			includedChain=includedChain+chain
-	if len(includedChain)>0:
-		newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
-		f=open(newFileName, 'w')
-		f.writelines(filterHeader(header,includedChain.split()))
-		f.writelines(buffer)
-	else:
-		newFileName=''
-
-	return (newFileName)
-
-
-
 class PDBExtract(object):
+
+	
 
 	def __init__(self, **kwargs):
 
+		
 		self.files=kwargs.get('files')
 		self.fof = kwargs.get('fof')
 		self.header=kwargs.get('header')
@@ -172,13 +155,36 @@ class PDBExtract(object):
 		self.hetero = kwargs.get('hetero')
 		self.excludeseq = kwargs.get('excludeseq')
 		self.extractseq = kwargs.get('extractseq')
+		self.overwrite = kwargs.get('overwrite')
 		if self.extractseq or self.excludeseq:
 			if self.extractseq:
 				filename = self.extractseq
 			elif self.excludeseq:
 				filename = self.excludeseq
 			(self.querySeqFastaName, self.querySeqFasta) = readFasta(filename)
+		return
 
+	def saveChains(self, chains,header,includeList,filename):
+
+		buffer = []
+		includedChain = ''
+		for chain in sorted(includeList.iterkeys()):
+			if includeList[chain]:
+				buffer = buffer+chains[chain]
+				includedChain=includedChain+chain
+		if len(includedChain)>0:
+			if self.overwrite:
+				newFileName = filename
+				copy(filename,filename+".backup")
+			else:
+				newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
+			f=open(newFileName, 'w')
+			f.writelines(filterHeader(header,includedChain.split()))
+			f.writelines(buffer)
+		else:
+			newFileName=''
+
+		return (newFileName)
 
 	def pdbProcess(self, filename):
 	#
@@ -207,7 +213,12 @@ class PDBExtract(object):
 						buffer=buffer+chains[chain]
 						includedChain=includedChain+chain
 			if len(includedChain)>0:
-				newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
+				if self.overwrite:
+					newFileName = filename
+					copy(filename,filename+".backup")
+				else:
+					newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
+			
 				f = open(newFileName,'w')
 				if self.header:
 					filteredHeader = filterHeader(header,includedChain.split())
@@ -267,7 +278,7 @@ class PDBExtract(object):
 						if self.excludeseq:
 							includeList[chain]=True
 				
-				newFileName = saveChains(chains,header,includeList,filename)
+				newFileName = self.saveChains(chains,header,includeList,filename)
 			else:
 				newFileName=''
 
@@ -286,22 +297,27 @@ class PDBExtract(object):
 			# if two alignment give score higher than length of aa*3, it is considered as redundant chain
 			# and it will be removed.
 			#
-			if len(sequences)>1:
-				gapOpen=-10
-				gapExtend=-0.5
-				matrix = matlist.blosum62
-				for i in range(len(sequences)):
-					for j in range(i+1, len(sequences)):
-						aln = pairwise2.align.globalds(sequences[i],sequences[j],matrix,gapOpen,gapExtend)
-						query,subject,score,begin,end = aln[0]
-						cutoff = len(sequences[i])*3
-						if cutoff < score:
-							includeList[chainlist[j]] = False
-				newFileName = saveChains(chains,header,includeList,filename)
-			else:
-				newFileName=''
+			
+			gapOpen=-10
+			gapExtend=-0.5
+			matrix = matlist.blosum62
+			for i in range(len(sequences)):
+				for j in range(i+1, len(sequences)):
+					aln = pairwise2.align.globalds(sequences[i],sequences[j],matrix,gapOpen,gapExtend)
+					query,subject,score,begin,end = aln[0]
+					cutoff = len(sequences[i])*3
+					if cutoff < score:
+						includeList[chainlist[j]] = False
+			newFileName = self.saveChains(chains,header,includeList,filename)
+	
 		
 		if (self.hetero or self.filter) and (not self.exclude and not self.unique and not self.extract and not self.split):
+			if self.overwrite:
+				newFileName = filename
+				shutil.copy(filename,filename+".backup")
+			else:
+				newFileName = filename[:len(filename)-4]+"_"+includedChain+".pdb"
+
 			newFileName = filename[:len(filename)-4]+"_filtered"+".pdb"
 			f = open(newFileName,'w')
 			if self.header:
@@ -357,6 +373,8 @@ if __name__ == "__main__":
 						help='Remove designated type of residues. if you want to remove waters, -r HOH')
 	parser.add_argument('-ht', '--remove_heteroatom', action='store_true', dest='hetero', default=False,
 						help='Remove heteroatom')
+	parser.add_argument('-o', '--overwrite_original', action='store_true', dest='overwrite', default=False,
+						help='Remove heteroatom')
 	group.add_argument('-e', '--extract', action='store', dest='extract', 
 						help='Set chain to extract')
 	group.add_argument('-x', '--exclude', action='store', dest='exclude',
@@ -372,7 +390,7 @@ if __name__ == "__main__":
 	
 	results = parser.parse_args()
 	pdbExtract = PDBExtract(files=results.files, fof=results.fof, header=results.header, list=results.list,\
-							fasta=results.fasta, extract=results.extract, exclude=results.exclude,\
+							fasta=results.fasta, extract=results.extract, overwrite=results.overwrite, exclude=results.exclude,\
 							split=results.split, unique=results.unique, filter=results.filter,\
 							hetero=results.hetero, extractseq=results.extractseq, excludeseq=results.excludeseq)
 	fileList = pdbExtract.go()
