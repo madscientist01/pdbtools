@@ -36,39 +36,39 @@ def readFasta(filename) :
 
 def PDBParse(pdb,filter,hetero):
 
-		headers = []
-		headerRecordList = ["HEADER","TITLE","COMPND","SOURCE","KEYWDS","EXPDTA","AUTHOR",\
-							"REVDAT","JRNL","REMARK","DBREF","SEQRES","MODRES","HET","HETNAM",\
-							"HETSYN","FORMUL","HELIX","SHEET","LINK","SITE","CRYST1","ORIGX1",\
-							"ORIGX2","ORIGX3","SCALE1","SCALE2","SCALE3"]
-		dataRecordList = ["ATOM", "TER", "HETATM"]
-		chains = {}
-		currentChain = ''
-		if os.path.exists(pdb):
-			f = open(pdb)
+	headers = []
+	headerRecordList = ["HEADER","TITLE","COMPND","SOURCE","KEYWDS","EXPDTA","AUTHOR",\
+						"REVDAT","JRNL","REMARK","DBREF","SEQRES","MODRES","HET","HETNAM",\
+						"HETSYN","FORMUL","HELIX","SHEET","LINK","SITE","CRYST1","ORIGX1",\
+						"ORIGX2","ORIGX3","SCALE1","SCALE2","SCALE3"]
+	dataRecordList = ["ATOM", "TER", "HETATM"]
+	chains = {}
+	currentChain = ''
+	if os.path.exists(pdb):
+		f = open(pdb)
+		line = f.readline()
+		while line:
 			line = f.readline()
-			while line:
-				line = f.readline()
-				head = line[0:6].strip()
-				if head in headerRecordList:
-					headers.append(line)
-				if head in dataRecordList:
-					chainid = line [21:22]
-					if not chainid in chains:
-						chainContent = []
-						chains[chainid]=chainContent
+			head = line[0:6].strip()
+			if head in headerRecordList:
+				headers.append(line)
+			if head in dataRecordList:
+				chainid = line [21:22]
+				if not chainid in chains:
+					chainContent = []
+					chains[chainid]=chainContent
 
-					append = True
-					if hetero and head == "HETATM":
-						append = False
+				append = True
+				if hetero and head == "HETATM":
+					append = False
 
-					if filter == line[17:20]:
-						append = False
+				if filter == line[17:20]:
+					append = False
 
-					if append :
-						chains[chainid].append(line)
+				if append :
+					chains[chainid].append(line)
 
-		return(headers,chains)
+	return(headers,chains)
 
 def filterATOM(chains,extractRegion):
 	#
@@ -89,10 +89,10 @@ def filterATOM(chains,extractRegion):
 	return (buffer)
 
 def fastaParsing (header):
-#
-# Parse SEQRES lines in PDB REMAKR and save it as one letter codes.
-#
-#
+	#
+	# Parse SEQRES lines in PDB REMAKR and save it as one letter codes.
+	#
+	#
 	oneLetter ={'VAL':'V', 'ILE':'I', 'LEU':'L', 'GLU':'E', 'GLN':'Q', \
 	'ASP':'D', 'ASN':'N', 'HIS':'H', 'TRP':'W', 'PHE':'F', 'TYR':'Y',    \
 	'ARG':'R', 'LYS':'K', 'SER':'S', 'THR':'T', 'MET':'M', 'ALA':'A',    \
@@ -119,9 +119,9 @@ def fastaParsing (header):
 	return(seqres)
 
 def filterHeader(header,chainlist):
-#
-# split sequence in fasta string into predefined width of string lists
-#
+	#
+	# split sequence in fasta string into predefined width of string lists
+	#
 	filteredHeader = []
 	for line in header:
 		if line[0:6] == "SEQRES":
@@ -135,9 +135,9 @@ def filterHeader(header,chainlist):
 
 
 def fastaSplit(fasta,width):
-#
-# split sequence in fasta string into predefined width of string lists
-#
+	#
+	# split sequence in fasta string into predefined width of string lists
+	#
 
 	cursor = 0
 	end = 0
@@ -237,8 +237,6 @@ class PDBExtract(object):
 
 		return(newFileName)
 
-
-
 	def extractExclude(self,header,chains,filename):
 
 		buffer = []
@@ -271,6 +269,7 @@ class PDBExtract(object):
 
 
 	def splitChains(self,header,chains,filename):
+
 		for chain in chains:
 			newFileName =filename[:len(filename)-4]+"_"+chain+".pdb" 
 			f = open(newFileName,'w')
@@ -282,6 +281,7 @@ class PDBExtract(object):
 		return (newFileName)
 
 	def fastaSeq(self,header,filename):
+
 		sequence = fastaParsing(header)
 		newFileName =filename[:len(filename)-4]+".fasta" 
 		f = open(newFileName,'w')
@@ -360,6 +360,7 @@ class PDBExtract(object):
 
 
 	def pdbProcess(self, filename):
+
 	#
 	# Parse pdb content and extract using regex
 	#

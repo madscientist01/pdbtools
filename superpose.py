@@ -6,6 +6,8 @@
 #
 
 import sys, subprocess, re, os, glob, argparse
+from pdbextract import *
+
 
 class Aligned():
 #
@@ -64,21 +66,23 @@ class Superpose():
 	#
 	# Generate structural alignment as FASTA formats
 	#
-		fasta = []	
-		queryHeader = (self.queryAlign[self.upper].chain+":"+
-					   str(self.queryAlign[self.upper].number)+"-"+
-					   self.queryAlign[self.lower].chain+":"+
-					   str(self.queryAlign[self.lower].number))
+		fasta = []
+		if len(self.queryAlign)>0:
+			
+			queryHeader = (self.queryAlign[self.upper].chain+":"+
+						   str(self.queryAlign[self.upper].number)+"-"+
+						   self.queryAlign[self.lower].chain+":"+
+						   str(self.queryAlign[self.lower].number))
 
-		fasta.append(">{0}:{1}\n".format(self.queryPDB[:len(self.queryPDB)-4],queryHeader))
-		fasta=fasta+self.fastaSplit(self.querySeq,60)
-		subjectHeader=	(self.subjectAlign[self.upper].chain+":"+
-						 str(self.subjectAlign[self.upper].number)+"-"+
-						 self.subjectAlign[self.lower].chain+":"+
-						 str(self.subjectAlign[self.lower].number))
+			fasta.append(">{0}:{1}\n".format(self.queryPDB[:len(self.queryPDB)-4],queryHeader))
+			fasta=fasta+self.fastaSplit(self.querySeq,60)
+			subjectHeader=	(self.subjectAlign[self.upper].chain+":"+
+							 str(self.subjectAlign[self.upper].number)+"-"+
+							 self.subjectAlign[self.lower].chain+":"+
+							 str(self.subjectAlign[self.lower].number))
 
-		fasta.append(">{0}:{1}\n".format(self.subjectPDB[:len(self.subjectPDB)-4],subjectHeader))
-		fasta=fasta+self.fastaSplit(self.subjectSeq,60)
+			fasta.append(">{0}:{1}\n".format(self.subjectPDB[:len(self.subjectPDB)-4],subjectHeader))
+			fasta=fasta+self.fastaSplit(self.subjectSeq,60)
 		return(fasta)
 		
 
@@ -119,6 +123,13 @@ class Superpose():
 		self.lower = lTrim
 
 		return 
+
+	def extractSuperposedPDB(self):
+
+		if os.path.exists(self.superposedPDB) and len(self.queryAlign)>0:
+		
+
+
 	def run(self):
 	#
 	# Run superpose with two PDB file (self.queryPDB and self.subjectPDB)
@@ -206,9 +217,9 @@ class Superpose():
 			return(success)				
 
 def pdbparsing(filename, regex):
-#
-# Parse pdb content and extract using regex
-#
+	#
+	# Parse pdb content and extract using regex
+	#
 	if os.path.exists(filename):
 		pdb = open(filename)
 		pdbcontent = pdb.readlines()
@@ -232,10 +243,10 @@ def pdbparsing(filename, regex):
 
 def htmlout(queryid, queryDescription, renderingSubjectDescriptions,tableSubjectDescriptions,
 		    rmsd,qscore,align,filename):
-#
-# Generate render.html which display rendered png files
-#
-#
+	#
+	# Generate render.html which display rendered png files
+	#
+	#
 	htmlheader = """
 <!DOCTYPE html>
 <html>
@@ -322,7 +333,6 @@ def htmlout(queryid, queryDescription, renderingSubjectDescriptions,tableSubject
 	htmloutput.write(htmlfooter)
 	htmloutput.close()
 
-
 def main(argument):
 
 	pdbList=argument.files
@@ -370,7 +380,6 @@ def main(argument):
 										f = open(superposedFilename[:len(superposedFilename)-4]+".fasta","w")
 										f.writelines(aligned)
 										f.close()
-
 							else:
 								RMSDDic[superposedFilename] = 99
 								QDic[superposedFilename] = 0
@@ -412,9 +421,6 @@ def main(argument):
 							pymolloadingFile.write("show cartoon, {0}\n".format(singlepdb[:-4]))
 							pymolloadingFile.write("show cartoon, {0}\n".format(pdb[:-4]))
 							pymolloadingFile.write("util.cbc {0}\n".format(pdb[:-4]))
-							#pymolloadingFile.write("util.cbc {0},first_color=1\n".format(singlepdb[:-4]))
-							# pymolloadingFile.write("color red, {0}\n".format(singlepdb[:-4]))
-							# pymolloadingFile.write("color yellow, {0}\n".format(pdb[:-4]))
 							if not argument.view:
 								pymolloadingFile.write("orient {0}\n".format(pdb[:-4]))
 							pymolloadingFile.write("show cartoon, {0}\n".format(pdb[:-4]))
@@ -443,6 +449,8 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-r', '--reference_pdb', nargs='+', dest='files',default=[],
 	                    help='Files to process')
+	parser.add_argument('-e', '--extract_superimpose', action='store_true', dest='extract',default=False,
+						help='Extract superposed region')
 	parser.add_argument('-d', '--rmsd_cutoff', action='store', dest='rmsd',type=float,
 						help='Set RMSD cutoff')
 	parser.add_argument('-s', '--score_cutoff', action='store', dest='score',type=float,
