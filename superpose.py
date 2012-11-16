@@ -124,10 +124,26 @@ class Superpose():
 
 		return 
 
-	def extractSuperposedPDB(self):
+	def extractSuperposedPDB(self,filename):
 
 		if os.path.exists(self.superposedPDB) and len(self.queryAlign)>0:
-		
+			startchain = self.queryAlign[self.upper].chain;
+			start = self.queryAlign[self.upper].number;
+			endchain = self.queryAlign[self.lower].chain;
+			end = self.queryAlign[self.lower].number;
+			[header,chains] = PDBParse(self.superposedPDB,None,None)
+
+			if startchain ==endchain:
+				extractRegion = "{0}:{1}-{2}".format(startchain,start,end)
+			else:
+				extractRegion = "{0}:{1}-{2} {3}:{4}-{5}".format(startchain,start,9999,endchain,1,end)
+			pdbExtract = PDBExtract(extractregion = extractRegion)
+			newFileName=pdbExtract.extractRegions(header,chains,filename)
+			return(newFileName)
+		else:
+			print "problem"
+			return(filename)
+	
 
 
 	def run(self):
@@ -186,7 +202,7 @@ class Superpose():
 					subjectSecondary = line[28+a:29+a].strip()
 					subjectChain=line[31+a:32+a].strip()
 					subjectAmino=line[33+a:36+a].strip()
-					subjectAminoNum=line[37+a:40+a].strip()
+					subjectAminoNum=line[36+a:40+a].strip()
 					
 					query = False
 					subject = False
@@ -316,7 +332,7 @@ def htmlout(queryid, queryDescription, renderingSubjectDescriptions,tableSubject
 		if match:
 			query = match.group(1)
 			subject = match.group(2)
-		htmloutput.write(imgtag.format(pdb[:-4]+".png", query,queryDescription,subject,desc,
+		htmloutput.write(imgtag.format(pdb[:-4]+".png", subject,subjectDescription,subject,desc,
 			             rmsd[pdb],qscore[pdb],align[pdb]))
 
 	for pdb,desc in tableSubjectDescriptions.items():
@@ -367,7 +383,11 @@ def main(argument):
 
 							sup = Superpose(queryPDB=onePdb, subjectPDB=pdb, 
 											superposedPDB=superposedFilename)
-							if sup.run():				
+							if sup.run():
+								if argument.extract:
+									superposedFilename = sup.extractSuperposedPDB(superposedFilename)
+
+
 								RMSDDic[superposedFilename] = sup.RMSD
 								QDic[superposedFilename] = sup.qscore
 								alignedDic[superposedFilename] = sup.aligned

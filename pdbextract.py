@@ -82,8 +82,10 @@ def filterATOM(chains,extractRegion):
 			s,e = extractRegion[chain].split("-")
 			start=int(s)
 			end = int(e)
+			# print start,end
 			for line in chains[chain]:
-				residueNumber = int(line[23:26].strip())
+				residueNumber = int(line[22:26].strip())
+				# print residueNumber,start,end
 				if residueNumber >=start and residueNumber <=end:
 					buffer.append(line)
 	return (buffer)
