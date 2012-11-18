@@ -10,9 +10,9 @@ from pdbextract import *
 
 
 class Aligned():
-#
-# Storage class for the structural alignment in Superpose output file
-#
+	#
+	# Storage class for the structural alignment in Superpose output file
+	#
 	def __init__(self, **kwargs):
 		self.pdb = kwargs.get('pdb')
 		self.chain = kwargs.get('chain')
@@ -35,7 +35,7 @@ class Superpose():
 		self.subjectPDB = kwargs.get('subjectPDB')
 		self.superposedPDB=kwargs.get('superposedPDB')
 		self.outfile = ""
-		self.RMSD = 0
+		self.rmsd = 0
 		self.aligned = 0
 		self.qscore = 0	
 		self.queryAlign = []
@@ -47,9 +47,9 @@ class Superpose():
 	
 
 	def fastaSplit(self,fasta,width):
-	#
-	# Split sequence in fasta string into predefined width of string lists
-	#
+		#
+		# Split sequence in fasta string into predefined width of string lists
+		#
 		cursor = 0
 		end = 0
 		buffer = []
@@ -63,9 +63,9 @@ class Superpose():
 		return(buffer)	
 
 	def FASTAoutput(self):
-	#
-	# Generate structural alignment as FASTA formats
-	#
+		#
+		# Generate structural alignment as FASTA formats
+		#
 		fasta = []
 		if len(self.queryAlign)>0:
 			
@@ -87,6 +87,7 @@ class Superpose():
 		
 
 	def generateAlignment(self):
+		
 		oneLetter ={'VAL':'V', 'ILE':'I', 'LEU':'L', 'GLU':'E', 'GLN':'Q', \
 					'ASP':'D', 'ASN':'N', 'HIS':'H', 'TRP':'W', 'PHE':'F', 'TYR':'Y',    \
 					'ARG':'R', 'LYS':'K', 'SER':'S', 'THR':'T', 'MET':'M', 'ALA':'A',    \
@@ -147,37 +148,38 @@ class Superpose():
 
 
 	def run(self):
-	#
-	# Run superpose with two PDB file (self.queryPDB and self.subjectPDB)
-	#
+
+		#
+		# Run superpose with two PDB file (self.queryPDB and self.subjectPDB)
+		#
 		if os.path.exists(self.queryPDB) and os.path.exists(self.subjectPDB):
 			p = subprocess.Popen(['superpose',self.queryPDB,self.subjectPDB,self.superposedPDB],
 											  stdout=subprocess.PIPE)
-	#
-	# stdout from superpose will be saved into p_stdout
-	#
+		#
+		# stdout from superpose will be saved into p_stdout
+		#
 			p_stdout = p.stdout.read()
 			self.outfile = self.superposedPDB[:len(self.superposedPDB)-4]+'.out'
 			fw = open(self.outfile,'w')
 			fw.write(p_stdout)
 			fw.close()
-	#
-	# Parsing output file. RMSD, Q-score, # of aligned residues are parsed using regex
-	#
+		#
+		# Parsing output file. RMSD, Q-score, # of aligned residues are parsed using regex
+		#
 			regex = re.compile(" at RMSD =\s+([\d.]+),\s+Q=\s+([\d.]+)\s+and alignment length\s+([\d.]+)")
 			match = regex.search(p_stdout)
 			
 			if match:
-				self.RMSD= float(match.group(1))
+				self.rmsd= float(match.group(1))
 				self.qscore=float(match.group(2))
 				self.aligned=aligned=float(match.group(3))
 				success=True
 			else:
 				success=False
 				return(success)
-	#
-	# Parsing sequence alignment 
-	#			
+		#
+		# Parsing sequence alignment 
+		#			
 			data = p_stdout.split("\n")	
 			capture = False
 
@@ -257,8 +259,7 @@ def pdbparsing(filename, regex):
 
 
 
-def htmlout(queryid, queryDescription, renderingSubjectDescriptions,tableSubjectDescriptions,
-		    rmsd,qscore,align,filename):
+def htmlout(table,argument,pdb):
 	#
 	# Generate render.html which display rendered png files
 	#
@@ -335,6 +336,7 @@ def htmlout(queryid, queryDescription, renderingSubjectDescriptions,tableSubject
 		htmloutput.write(imgtag.format(pdb[:-4]+".png", subject,subjectDescription,subject,desc,
 			             rmsd[pdb],qscore[pdb],align[pdb]))
 
+	
 	for pdb,desc in tableSubjectDescriptions.items():
 		match = re.match("(\S+)_(\S+).pdb",pdb)
 		if match:
@@ -349,10 +351,74 @@ def htmlout(queryid, queryDescription, renderingSubjectDescriptions,tableSubject
 	htmloutput.write(htmlfooter)
 	htmloutput.close()
 
+
+
+def pymolRendering(table,argument,pdb):
+
+	PyMOLPath = '/Applications/MacPyMOL.app/Contents/MacOS/MacPyMol'
+	pymolFile = open(pdb[:len(pdb)-4]+".pml","w")
+	if argument.view:
+		if os.path.exists(argument.view):
+			f = open(argument.view)
+			view = f.readlines()
+			if re.match("^set_view",view[0]):
+				for line in view:
+					pymolFile.write(line)
+			f.close()
+
+	pymolFile.write("bg_color white\n")
+	pymolFile.write("hide all\n")
+	pymolFile.write("load {0}/{1}\n".format(os.getcwd(),pdb))
+
+	for superposed,align in table.items():
+		write = True
+		if (argument.score and (align.qscore>=float(argument.score))):
+			print "{0} is skipped. Q Score:{1}".format(align.queryPDB, align.qscore)
+			write = False	
+
+		if (argument.rmsd and (align.rmsd>=float(argument.rmsd))):
+			print "{0} is skipped. Q Score:{1}".format(align.queryPDB, align.rmsd)
+			write = False
+		
+		if (argument.align and (align.aligned>=float(argument.align))):
+			print "{0} is skipped. Q Score:{1}".format(align.queryPDB, align.aligned)
+			write = False
+
+		if write:
+
+			if argument.stepwise:			
+				pymolFile.write("load {0}/{1}\n".format(os.getcwd(),align.superposedPDB))
+				pymolFile.write("hide all\n")			
+				pymolFile.write("show cartoon, {0}\n".format(align.superposedPDB[:-4]))
+				pymolFile.write("show cartoon, {0}\n".format(pdb[:-4]))
+				pymolFile.write("util.cbc {0}\n".format(align.superposedPDB[:-4]))
+
+				if not argument.view:
+					pymolFile.write("orient {0}\n".format(pdb[:-4]))
+				pymolFile.write("show cartoon, {0}\n".format(pdb[:-4]))
+				pymolFile.write("png {0}.png\n".format(align.superposedPDB[:-4]))
+			else:
+				pymolFile.write("load {0}/{1}\n".format(os.getcwd(),singlepdb))
+	
+	pymolFile.write("hide all\n")
+	pymolFile.write("show cartoon\n")
+	pymolFile.close()
+	
+	if argument.render:
+		print "Running PyMol..."
+		p = subprocess.Popen([PyMOLPath,'-c',pdb+'.pml'],
+							  stdout=subprocess.PIPE)
+		p_stdout = p.stdout.read()
+	# if argument.stepwise:
+		# htmlout(pdb,pdbparsing(pdb, '^TITLE    [ \d](.*)$'),renderingSubjectDescriptions,
+		# 					   tableSubjectDescriptions,RMSDDic,QDic,alignedDic,pdb+'.html')
+	
+
+
 def main(argument):
 
 	pdbList=argument.files
-	PyMOLPath = '/Applications/MacPyMOL.app/Contents/MacOS/MacPyMol'
+	
 	if len(pdbList)>0 :
 		for pdb in pdbList:	
 			if os.path.exists(pdb):
@@ -362,20 +428,9 @@ def main(argument):
 				RMSDDic = {}
 				QDic = {}
 				alignedDic = {}
-				
-				informationFile = open(pdb+'.txt','w')
-				pymolloadingFile = open(pdb+'.pml','w')
-				if argument.view:
-					if os.path.exists(argument.view):
-						f = open(argument.view)
-						view = f.readlines()
-						if re.match("^set_view",view[0]):
-							for line in view:
-								pymolloadingFile.write(line)
-						f.close()
-
+	
 				if len(subjectList)>0:
-					tableSubjectDescriptions = {}
+					table = {}
 					for onePdb in subjectList:
 						if (onePdb != pdb) :
 							print "Processing {0}".format(onePdb)
@@ -386,83 +441,21 @@ def main(argument):
 							if sup.run():
 								if argument.extract:
 									superposedFilename = sup.extractSuperposedPDB(superposedFilename)
-
-
-								RMSDDic[superposedFilename] = sup.RMSD
-								QDic[superposedFilename] = sup.qscore
-								alignedDic[superposedFilename] = sup.aligned
-								tableSubjectDescriptions[superposedFilename]=pdbparsing(superposedFilename, 
-																						'^TITLE    [ \d](.*)$')
+									sup.superposedPDB = superposedFilename
+								
+								table[superposedFilename]=sup
 								pdbLoadList.append(superposedFilename)
 								if argument.stalign:
 									aligned = sup.FASTAoutput()
 									if aligned:
 										f = open(superposedFilename[:len(superposedFilename)-4]+".fasta","w")
 										f.writelines(aligned)
-										f.close()
-							else:
-								RMSDDic[superposedFilename] = 99
-								QDic[superposedFilename] = 0
-								alignedDic[superposedFilename] = 0
-								tableSubjectDescriptions[superposedFilename]='Alignment Failed'
-								
-							tablelist = {}
-							informationFile.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\n"
-												  .format(pdb, onePdb, superposedFilename,sup.RMSD,
-												  		  sup.qscore,sup.aligned))
-								
-				
-				informationFile.close() 
-				pymolloadingFile.write("bg_color white\n")
-				pymolloadingFile.write("hide all\n")
-				pymolloadingFile.write("load {0}/{1}\n".format(os.getcwd(),pdb))
-				renderingSubjectDescriptions={}
-
-				for singlepdb in pdbLoadList:
-					write = True
-					if (argument.score and (QDic[singlepdb]>=float(argument.score))):
-						print "{0} is skipped. Q Score:{1}".format(singlepdb, RMSDDic[singlepdb])
-						write = False	
-
-					if  (argument.rmsd and (RMSDDic[singlepdb]>=float(argument.rmsd))):
-						print "{0} is skipped. RMSD:{1}".format(singlepdb, QDic[singlepdb])
-						write = False
-
-					if (argument.align and (alignedDic[singlepdb]>=float(argument.align))):
-						print "{0} is skipped. Align:{1}".format(singlepdb, alignedDic[singlepdb])
-						write = False
-
-					if write:
-
-						if argument.stepwise:
-							renderingSubjectDescriptions[singlepdb]=pdbparsing(singlepdb, '^TITLE    [ \d](.*)$')							
-							pymolloadingFile.write("load {0}/{1}\n".format(os.getcwd(),singlepdb))
-							pymolloadingFile.write("hide all\n")			
-							pymolloadingFile.write("show cartoon, {0}\n".format(singlepdb[:-4]))
-							pymolloadingFile.write("show cartoon, {0}\n".format(pdb[:-4]))
-							pymolloadingFile.write("util.cbc {0}\n".format(pdb[:-4]))
-							if not argument.view:
-								pymolloadingFile.write("orient {0}\n".format(pdb[:-4]))
-							pymolloadingFile.write("show cartoon, {0}\n".format(pdb[:-4]))
-							pymolloadingFile.write("png {0}.png\n".format(singlepdb[:-4]))
-						else:
-							pymolloadingFile.write("load {0}/{1}\n".format(os.getcwd(),singlepdb))
-				
-				pymolloadingFile.write("hide all\n")
-				pymolloadingFile.write("show cartoon\n")
-				pymolloadingFile.close()
-				
-				if argument.render:
-					print "Running PyMol..."
-					p = subprocess.Popen([PyMOLPath,'-c',pdb+'.pml'],
-										  stdout=subprocess.PIPE)
-					p_stdout = p.stdout.read()
-				if argument.stepwise:
-					htmlout(pdb,pdbparsing(pdb, '^TITLE    [ \d](.*)$'),renderingSubjectDescriptions,
-										   tableSubjectDescriptions,RMSDDic,QDic,alignedDic,pdb+'.html')
-			else:
-				print "File is not exist!"
-		sys.exit()		
+										f.close()		
+							
+					pymolRendering(table, argument,pdb)
+				else:
+					print "File is not exist!"
+					sys.exit()		
 
 if __name__ == "__main__":
 
