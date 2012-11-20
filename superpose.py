@@ -275,6 +275,7 @@ def htmlout(table,argument,pdb):
 	<body>
 """
 	imgtag = """
+		<a name="{6}"></a>
 		<img src="./{0}">
 		<p><a href="http://www.rcsb.org/pdb/explore/explore.do?structureId={1}">{1}:{2}</a></p>
 		<p>RMSD: {3} Angstrom</p>
@@ -305,13 +306,12 @@ def htmlout(table,argument,pdb):
 			<td> <a href="http://www.rcsb.org/pdb/explore/explore.do?structureId={0}">{0} </td>
 			<td> {1} </td>
 			<td> <a href="http://www.rcsb.org/pdb/explore/explore.do?structureId={2}">{2} </td>
-			<td> {3} </td>
+			<td> <a href="#{7}">{3}</a></td>
 			<td> {4} </td>
 			<td> {5} </td>
 			<td> {6} </td>
 		</tr>
 """
-
 
 	htmlfooter = """
 	</body>
@@ -329,14 +329,12 @@ def htmlout(table,argument,pdb):
 		[header,chains] = PDBParse(align.superposedPDB,None,None)
 		title = extractHeader(header,'^TITLE    [ \d](.*)$',True)
 		pdbid = extractHeader(header,'^DBREF  (\S{4}) ',False)
-		htmloutput.write(imgtag.format(alignpdb[:len(alignpdb)-4]+".png",pdbid,title,align.rmsd,align.qscore,align.aligned))
-		descTable = descTable+tableContent.format(queryPDBId, queryTitle,pdbid,title,align.rmsd,align.qscore,align.aligned)
+		htmloutput.write(imgtag.format(alignpdb[:len(alignpdb)-4]+".png",pdbid,title,align.rmsd,align.qscore,align.aligned,alignpdb))
+		descTable = descTable+tableContent.format(queryPDBId, queryTitle,pdbid,title,align.rmsd,align.qscore,align.aligned,alignpdb)
 	
 	htmloutput.write(descTable+"</tbody></table>\n")	
 	htmloutput.write(htmlfooter)
 	htmloutput.close()
-
-
 
 def pymolRendering(table,argument,pdb):
 
