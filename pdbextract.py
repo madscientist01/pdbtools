@@ -48,7 +48,6 @@ def PDBParse(pdb,filter,hetero):
 		f = open(pdb)
 		line = f.readline()
 		while line:
-			line = f.readline()
 			head = line[0:6].strip()
 			if head in headerRecordList:
 				headers.append(line)
@@ -67,6 +66,7 @@ def PDBParse(pdb,filter,hetero):
 
 				if append :
 					chains[chainid].append(line)
+			line = f.readline()
 
 	return(headers,chains)
 
@@ -121,9 +121,9 @@ def fastaParsing (header):
 	return(seqres)
 
 def filterHeader(header,chainlist):
-	#
+	
 	# split sequence in fasta string into predefined width of string lists
-	#
+	
 	filteredHeader = []
 	for line in header:
 		if line[0:6] == "SEQRES":
@@ -135,6 +135,25 @@ def filterHeader(header,chainlist):
 
 	return(filteredHeader)	
 
+def extractHeader(header,regex,multiline):
+	#
+	# split sequence in fasta string into predefined width of string lists
+	#	
+	matched = ''
+	matchedcount=0
+	reg = re.compile(regex)
+	for line in header:
+		match = reg.match(line)
+		if match:
+			if multiline:
+				if matchedcount==0:
+					gap = " "
+				else:
+					gap = ""
+				matched = matched+gap+match.group(1).strip()
+			else:
+				matched = match.group(1).strip()
+	return (matched)
 
 def fastaSplit(fasta,width):
 	#

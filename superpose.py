@@ -87,7 +87,7 @@ class Superpose():
 		
 
 	def generateAlignment(self):
-		
+
 		oneLetter ={'VAL':'V', 'ILE':'I', 'LEU':'L', 'GLU':'E', 'GLN':'Q', \
 					'ASP':'D', 'ASN':'N', 'HIS':'H', 'TRP':'W', 'PHE':'F', 'TYR':'Y',    \
 					'ARG':'R', 'LYS':'K', 'SER':'S', 'THR':'T', 'MET':'M', 'ALA':'A',    \
@@ -138,15 +138,13 @@ class Superpose():
 				extractRegion = "{0}:{1}-{2}".format(startchain,start,end)
 			else:
 				extractRegion = "{0}:{1}-{2} {3}:{4}-{5}".format(startchain,start,9999,endchain,1,end)
-			pdbExtract = PDBExtract(extractregion = extractRegion)
+			pdbExtract = PDBExtract(extractregion = extractRegion, header=True)
 			newFileName=pdbExtract.extractRegions(header,chains,filename)
 			return(newFileName)
 		else:
 			print "problem"
 			return(filename)
 	
-
-
 	def run(self):
 
 		#
@@ -234,28 +232,7 @@ class Superpose():
 			self.generateAlignment()
 			return(success)				
 
-def pdbparsing(filename, regex):
-	#
-	# Parse pdb content and extract using regex
-	#
-	if os.path.exists(filename):
-		pdb = open(filename)
-		pdbcontent = pdb.readlines()
-		matched = ''
-		matchedcount=0
-		reg = re.compile(regex)
-		for line in pdbcontent:
-			match = reg.match(line)
-			if match:
-				if matchedcount==0:
-					gap = " "
-				else:
-					gap = ""
-				matched = matched+gap+match.group(1).strip()
-		return (matched)
-	else:
-		print "{0} is not found!".format(filename)
-		sys.exit()
+
 
 
 
@@ -271,32 +248,46 @@ def htmlout(table,argument,pdb):
     	<title>List</title>
  		<meta charset='utf-8'>
 	</head>
+	<!-- DataTables CSS -->
+	<link rel="stylesheet" type="text/css" href="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/css/jquery.dataTables.css">
+ 
+	<!-- jQuery -->
+	<script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.8.2.min.js"></script>
+ 
+	<!-- DataTables -->
+	<script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+	<script>
+	$(document).ready(function(){
+  		$('#listtable').dataTable();
+	});
+	</script>
 	<style>
-		table{
+	table{
 			    font-family: "Lucida Sans Unicode", "Lucida Grande", Sans-Serif;
-			    font-size: 12px;
+			    font-size: 11px;
 			    #margin: 45px;
 			    width:100%;
 			    text-align: left;
 			    border-collapse: collapse;  
-				}
-			tr:nth-child(odd) {
-				background-color: #999999;
-			}
+		}
+			
 	</style>
 	<body>
 """
 	imgtag = """
 		<img src="./{0}">
 		<p><a href="http://www.rcsb.org/pdb/explore/explore.do?structureId={1}">{1}:{2}</a></p>
-		<p><a href="http://www.rcsb.org/pdb/explore/explore.do?structureId={3}">{3}:{4}</a></p>
-		<p>RMSD: {5} Angstrom</p>
-		<p>Q Score: {6}</p>
-		<p>Aligned: {7}</p>
+		<p>RMSD: {3} Angstrom</p>
+		<p>Q Score: {4}</p>
+		<p>Aligned: {5}</p>
+"""
+	alignheader = """
+	<p><a href="http://www.rcsb.org/pdb/explore/explore.do?structureId={0}">{0}:{1}</a></p>
 """
 
 	tableHeader = """
-		<table>
+		<table id="listtable">
+		<thead>
 		<tr>
 			<td>PDB Reference id </td>
 			<td>Reference </td>
@@ -306,6 +297,8 @@ def htmlout(table,argument,pdb):
 			<td>Q Score (0-1) </td>
 			<td>Aligned AA (#) </td>
 		</tr>
+		</thead>
+		<tbody>
 """
 	tableContent = """
 		<tr>
@@ -324,30 +317,22 @@ def htmlout(table,argument,pdb):
 	</body>
 </html>
 """
+	filename = pdb[:len(pdb)-4]+'.html'
 	htmloutput = open(filename,'w')
 	htmloutput.write(htmlheader)
-	table = tableHeader
-	for pdb,desc in renderingSubjectDescriptions.items():
-
-		match = re.match("(\S+)_(\S+).pdb",pdb)
-		if match:
-			query = match.group(1)
-			subject = match.group(2)
-		htmloutput.write(imgtag.format(pdb[:-4]+".png", subject,subjectDescription,subject,desc,
-			             rmsd[pdb],qscore[pdb],align[pdb]))
-
+	[header,chains] = PDBParse(pdb,None,None)
+	queryTitle = extractHeader(header,'^TITLE    [ \d](.*)$',True)
+	queryPDBId = extractHeader(header,'^DBREF  (\S{4}) ',False)
+	htmloutput.write(alignheader.format(queryPDBId,queryTitle))
+	descTable = tableHeader
+	for alignpdb,align in table.items():
+		[header,chains] = PDBParse(align.superposedPDB,None,None)
+		title = extractHeader(header,'^TITLE    [ \d](.*)$',True)
+		pdbid = extractHeader(header,'^DBREF  (\S{4}) ',False)
+		htmloutput.write(imgtag.format(alignpdb[:len(alignpdb)-4]+".png",pdbid,title,align.rmsd,align.qscore,align.aligned))
+		descTable = descTable+tableContent.format(queryPDBId, queryTitle,pdbid,title,align.rmsd,align.qscore,align.aligned)
 	
-	for pdb,desc in tableSubjectDescriptions.items():
-		match = re.match("(\S+)_(\S+).pdb",pdb)
-		if match:
-			query = match.group(1)
-			subject = match.group(2)
-		if desc == 'Alignment Failed':
-			table = table+tableContent.format(query,queryDescription,subject,desc,'None','None','None')
-		else:
-			table = table+tableContent.format(query,queryDescription,subject,desc,
-											  rmsd[pdb],qscore[pdb],align[pdb])
-	htmloutput.write(table+"</table>\n")
+	htmloutput.write(descTable+"</tbody></table>\n")	
 	htmloutput.write(htmlfooter)
 	htmloutput.close()
 
@@ -356,7 +341,8 @@ def htmlout(table,argument,pdb):
 def pymolRendering(table,argument,pdb):
 
 	PyMOLPath = '/Applications/MacPyMOL.app/Contents/MacOS/MacPyMol'
-	pymolFile = open(pdb[:len(pdb)-4]+".pml","w")
+	pmlFile = pdb[:len(pdb)-4]+".pml"
+	pymolFile = open(pmlFile,"w")
 	if argument.view:
 		if os.path.exists(argument.view):
 			f = open(argument.view)
@@ -391,11 +377,9 @@ def pymolRendering(table,argument,pdb):
 				pymolFile.write("hide all\n")			
 				pymolFile.write("show cartoon, {0}\n".format(align.superposedPDB[:-4]))
 				pymolFile.write("show cartoon, {0}\n".format(pdb[:-4]))
-				pymolFile.write("util.cbc {0}\n".format(align.superposedPDB[:-4]))
 
 				if not argument.view:
 					pymolFile.write("orient {0}\n".format(pdb[:-4]))
-				pymolFile.write("show cartoon, {0}\n".format(pdb[:-4]))
 				pymolFile.write("png {0}.png\n".format(align.superposedPDB[:-4]))
 			else:
 				pymolFile.write("load {0}/{1}\n".format(os.getcwd(),singlepdb))
@@ -406,11 +390,10 @@ def pymolRendering(table,argument,pdb):
 	
 	if argument.render:
 		print "Running PyMol..."
-		p = subprocess.Popen([PyMOLPath,'-c',pdb+'.pml'],
-							  stdout=subprocess.PIPE)
+		p = subprocess.Popen([PyMOLPath,'-c',pmlFile],stdout=subprocess.PIPE)
 		p_stdout = p.stdout.read()
-	# if argument.stepwise:
-		# htmlout(pdb,pdbparsing(pdb, '^TITLE    [ \d](.*)$'),renderingSubjectDescriptions,
+	if argument.stepwise:
+		htmlout(table,argument,pdb)
 		# 					   tableSubjectDescriptions,RMSDDic,QDic,alignedDic,pdb+'.html')
 	
 
@@ -452,7 +435,7 @@ def main(argument):
 										f.writelines(aligned)
 										f.close()		
 							
-					pymolRendering(table, argument,pdb)
+					pymolRendering(table,argument,pdb)
 				else:
 					print "File is not exist!"
 					sys.exit()		
