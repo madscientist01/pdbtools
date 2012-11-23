@@ -20,6 +20,7 @@ class Aligned():
 		self.aa = kwargs.get('aa')
 		self.distance = kwargs.get('distance')
 		self.aligned = kwargs.get('aligned')
+		self.secondary = kwargs.get('secondary')
 		if self.chain and self.number and self.aa:
 			self.id = self.chain+"_"+str(self.number)+"_"+self.aa
 		else:
@@ -44,6 +45,9 @@ class Superpose():
 		self.subjectSeq = ""
 		self.upper = 0
 		self.lower = 0
+		self.querySecondary = ""
+		self.alignSecondary = ""
+		self.alignDistance = []
 	
 
 	def fastaSplit(self,fasta,width):
@@ -61,6 +65,27 @@ class Superpose():
 			buffer.append(fasta[cursor:end]+"\n")
 			cursor+=width
 		return(buffer)	
+
+	def JSONoutput(self):
+		queryHeader= self.queryPDB[:len(self.queryPDB)-4]
+		querySeq = self.querySeq
+		subjectHeader=	self.subjectPDB[:len(self.subjectPDB)-4]
+		subjectSeq = self.subjectSeq
+		querySecondary = self.querySecondary
+		subjectSecondary = self.subjectSecondary
+		distance = self.distanceOutput()
+		jsons = """
+queryid:"{0}",
+query:"{1}", 
+subjectid:"{2}",
+subject:"{3}",
+distance:[{4}],
+querysecondary:"{5}",
+subjectsecondary:"{6}"
+		"""
+		output = "{"+jsons.format(queryHeader,querySeq,subjectHeader,subjectSeq,distance,querySecondary,subjectSecondary)+"}"
+		return (output)
+
 
 	def FASTAoutput(self):
 		#
@@ -84,7 +109,12 @@ class Superpose():
 			fasta.append(">{0}:{1}\n".format(self.subjectPDB[:len(self.subjectPDB)-4],subjectHeader))
 			fasta=fasta+self.fastaSplit(self.subjectSeq,60)
 		return(fasta)
-		
+
+	def distanceOutput(self):
+		distance = ",".join(self.alignedDistance)
+
+		return(distance)
+	
 
 	def generateAlignment(self):
 
@@ -94,8 +124,8 @@ class Superpose():
 					'GLY':'G', 'PRO':'P', 'CYS':'C', 'MSE':'M', '-':'-'}
 		sequence = ""
 		aligned = ""
-
-		for i in range(0,len(self.queryAlign)-1):
+		distance = []
+		for i in range(len(self.queryAlign)):
 			residue = self.queryAlign[i]
 		
 			if residue.aa in oneLetter:
@@ -108,21 +138,42 @@ class Superpose():
 				aligned = aligned+"X"
 
 		uTrim = 0
-		lTrim = len(sequence)-1
-		for i in range(len(sequence)-1):
+		lTrim = len(sequence)
+		for i in range(len(sequence)):
 			if self.queryAlign[i].distance:
 				uTrim = i
 				break
 
-		for i in reversed(range(len(sequence)-1)):
+		for i in reversed(range(len(sequence))):
 			if self.queryAlign[i].distance:	 
 				lTrim = i
 				break
+
 		self.querySeq=sequence[uTrim:lTrim+1]
 		self.subjectSeq=aligned[uTrim:lTrim+1]
 		self.upper = uTrim
 		self.lower = lTrim
+		qSecondary = ""
+		sSecondary = ""
+		for i in range(uTrim,lTrim+1):
+			residue = self.queryAlign[i]
+			if residue.distance:
+				distance.append(str(residue.distance))
+			else:
+				distance.append("99.9")
+			if residue.secondary:
+				qSecondary = qSecondary+residue.secondary
+			else:
+				qSecondary = qSecondary+" "
 
+			if residue.alignid.secondary:
+				sSecondary = sSecondary+residue.alignid.secondary
+			else:
+				sSecondary = sSecondary+" "
+
+		self.alignedDistance = distance	
+		self.querySecondary = qSecondary
+		self.subjectSecondary = sSecondary
 		return 
 
 	def extractSuperposedPDB(self,filename):
@@ -150,6 +201,7 @@ class Superpose():
 		#
 		# Run superpose with two PDB file (self.queryPDB and self.subjectPDB)
 		#
+
 		if os.path.exists(self.queryPDB) and os.path.exists(self.subjectPDB):
 			p = subprocess.Popen(['superpose',self.queryPDB,self.subjectPDB,self.superposedPDB],
 											  stdout=subprocess.PIPE)
@@ -208,14 +260,14 @@ class Superpose():
 					subject = False
 					if len(querySecondary)+len(queryChain)+len(queryAmino)+len(queryAminoNum)>0:
 						queryresidue = Aligned(pdb=self.queryPDB, chain=queryChain, aa=queryAmino,
-											   number=int(queryAminoNum),gap=False)
+											   number=int(queryAminoNum),gap=False,secondary=querySecondary)
 						query = True
 					else:
 						queryresidue = Aligned(pdb=self.queryPDB,aa="-",gap=True)
 
 					if len(subjectSecondary)+len(subjectChain)+len(subjectAmino)+len(subjectAminoNum)>0:
 						subjectresidue = Aligned(pdb=self.subjectPDB, chain=subjectChain, 
-												 aa=subjectAmino,number=int(subjectAminoNum),gap=False)
+												 aa=subjectAmino,number=int(subjectAminoNum),gap=False,secondary=subjectSecondary)
 						subject = True
 					else:
 						subjectresidue = Aligned(pdb=self.subjectPDB,aa="-", gap=True)
@@ -231,10 +283,6 @@ class Superpose():
 
 			self.generateAlignment()
 			return(success)				
-
-
-
-
 
 def htmlout(table,argument,pdb):
 	#
@@ -270,17 +318,25 @@ def htmlout(table,argument,pdb):
 			    text-align: left;
 			    border-collapse: collapse;  
 		}
-			
+	div.head {
+		font-family: Sans-Serif;
+		font-size: 14px;
+		border:3px solid #CCEEFF;
+		border-radius: 10px;
+		padding: 10px;
+	    align :center;
+		background-color: #FFFFFF;
+		}		
 	</style>
 	<body>
 """
 	imgtag = """
-		<a name="{6}"></a>
-		<img src="./{0}">
-		<p><a href="http://www.rcsb.org/pdb/explore/explore.do?structureId={1}">{1}:{2}</a></p>
-		<p>RMSD: {3} Angstrom</p>
-		<p>Q Score: {4}</p>
-		<p>Aligned: {5}</p>
+		<div class="head">
+			<a name="{6}"></a>
+			<img src="./{0}">
+			<p><a href="http://www.rcsb.org/pdb/explore/explore.do?structureId={1}">{1}:{2}</a></p>
+			<p>RMSD: {3} Angstrom, Q Score: {4}, Aligned: {5}</p>
+		</div>
 """
 	alignheader = """
 	<p><a href="http://www.rcsb.org/pdb/explore/explore.do?structureId={0}">{0}:{1}</a></p>
@@ -380,7 +436,7 @@ def pymolRendering(table,argument,pdb):
 					pymolFile.write("orient {0}\n".format(pdb[:-4]))
 				pymolFile.write("png {0}.png\n".format(align.superposedPDB[:-4]))
 			else:
-				pymolFile.write("load {0}/{1}\n".format(os.getcwd(),singlepdb))
+				pymolFile.write("load {0}/{1}\n".format(os.getcwd(),align.superposedPDB))
 	
 	pymolFile.write("hide all\n")
 	pymolFile.write("show cartoon\n")
@@ -392,8 +448,6 @@ def pymolRendering(table,argument,pdb):
 		p_stdout = p.stdout.read()
 	if argument.stepwise:
 		htmlout(table,argument,pdb)
-		# 					   tableSubjectDescriptions,RMSDDic,QDic,alignedDic,pdb+'.html')
-	
 
 
 def main(argument):
@@ -431,8 +485,22 @@ def main(argument):
 									if aligned:
 										f = open(superposedFilename[:len(superposedFilename)-4]+".fasta","w")
 										f.writelines(aligned)
-										f.close()		
-							
+										f.close()
+										# distance = sup.distanceOutput()
+										# if distance:
+										# 	f = open(superposedFilename[:len(superposedFilename)-4]+".distance","w")
+										# 	f.write(distance)
+										# 	f.close()
+										# if len(sup.querySecondary)>0:
+										# 	f = open(superposedFilename[:len(superposedFilename)-4]+".sec","w")
+										# 	f.write(sup.querySecondary+"\n")
+										# 	f.write(sup.subjectSecondary+"\n")
+										# 	f.close()
+										f = open(superposedFilename[:len(superposedFilename)-4]+".json","w")
+										f.write(sup.JSONoutput())
+										f.close()
+
+								
 					pymolRendering(table,argument,pdb)
 				else:
 					print "File is not exist!"

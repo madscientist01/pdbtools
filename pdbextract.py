@@ -15,7 +15,9 @@ from Bio import pairwise2
 from Bio.SubsMat import MatrixInfo as matlist
 
 def readFasta(filename) :
-
+	#
+	# Simple FASTA reader. return sequence name with sequence as a string
+	#
 	sequence = ''
 	sequenceName = ''
 	if os.path.exists(filename):
@@ -290,6 +292,11 @@ class PDBExtract(object):
 
 
 	def splitChains(self,header,chains,filename):
+		#
+		# newFileName only return the first splited file name 
+		# needed to be fixed...
+		#
+		#
 
 		for chain in chains:
 			newFileName =filename[:len(filename)-4]+"_"+chain+".pdb" 
