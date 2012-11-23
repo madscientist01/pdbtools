@@ -324,7 +324,7 @@ def htmlout(table,argument,pdb):
 		context.fillText('Distance (Angstrom)',lx,ly-15);
 		
 		for (var j=0;j<=3.0;j=j+0.5) {
-			var color='rgb(255,'+parseInt(85*j)+','+parseInt(85*j)+')';
+			var color='rgb('+parseInt(85*j)+','+parseInt(85*j)+',255)';
 			context.fillStyle = color;
 			context.fillRect(lx+j*50-5,ly-12,22,15);
 			context.fillStyle = 'black';
@@ -335,7 +335,7 @@ def htmlout(table,argument,pdb):
 		for (var i=0;i<length;i++) {
 			context.font = '12px sans-serif';
 			if (seq.distance[i]<3.0) {
-				var color='rgb(255,'+parseInt(85*seq.distance[i])+','+parseInt(85*seq.distance[i])+')';
+				var color='rgb('+parseInt(85*seq.distance[i])+','+parseInt(85*seq.distance[i])+',255)';
 				context.fillStyle = color;
 				context.fillRect(x-3,y-11,15,12);
 				context.fillRect(x-3,y+4,15,12);
