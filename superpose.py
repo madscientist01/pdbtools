@@ -2,12 +2,11 @@
 #
 # Wrapper of Superpose (CCP4)
 # Written by MadScientist (http://madscientist.wordpress.com)
-#
+# Require pdbextract.py and Biopython 
 #
 
 import sys, subprocess, re, os, glob, argparse
 from pdbextract import *
-
 
 class Aligned():
 	#
@@ -112,9 +111,7 @@ subjectsecondary:"{6}"
 
 	def distanceOutput(self):
 		distance = ",".join(self.alignedDistance)
-
-		return(distance)
-	
+		return(distance)	
 
 	def generateAlignment(self):
 
@@ -296,6 +293,10 @@ def htmlout(table,argument,pdb):
     	<title>List</title>
  		<meta charset='utf-8'>
 	</head>
+	<script type="text/javascript" charset="utf8" src="{0}"></script>
+"""
+
+	scriptsPart1= """
 	<!-- DataTables CSS -->
 	<link rel="stylesheet" type="text/css" href="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/css/jquery.dataTables.css">
  
@@ -305,23 +306,81 @@ def htmlout(table,argument,pdb):
 	<!-- DataTables -->
 	<script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
 	<script>
+		function draw(canvas,seq) {
+		
+		var context=canvas.getContext("2d");
+		var x = 50;
+		var y = 100;
+		var length = seq.query.length;
+		context.font = '12px sans-serif';
+		var column = 40;
+		var col = 0;
+		context.fillText(seq.queryid,x-50,y);
+		context.fillText(seq.subjectid,x-50,y+15);
+		
+		var lx=50
+		var ly=50
+		context.fillStyle = 'black';
+		context.fillText('Distance (Angstrom)',lx,ly-15);
+		
+		for (var j=0;j<=3.0;j=j+0.5) {
+			var color='rgb(255,'+parseInt(85*j)+','+parseInt(85*j)+')';
+			context.fillStyle = color;
+			context.fillRect(lx+j*50-5,ly-12,22,15);
+			context.fillStyle = 'black';
+			context.fillText(j.toFixed(1),lx+j*50,ly);
+			
+		}
+		context.textAlign = 'left'
+		for (var i=0;i<length;i++) {
+			context.font = '12px sans-serif';
+			if (seq.distance[i]<3.0) {
+				var color='rgb(255,'+parseInt(85*seq.distance[i])+','+parseInt(85*seq.distance[i])+')';
+				context.fillStyle = color;
+				context.fillRect(x-3,y-11,15,12);
+				context.fillRect(x-3,y+4,15,12);
+			}
+			context.fillStyle='black';
+			context.fillText(seq.querysecondary.substring(i,i+1), x, y-15);
+			context.fillText(seq.query.substring(i,i+1), x, y);
+			context.fillText(seq.subject.substring(i,i+1),x,y+15);
+			context.fillText(seq.subjectsecondary.substring(i,i+1), x, y+30);
+	
+			x=x+15;
+			col++;
+			if (col>column) {
+				y=y+70;
+				col=0;
+				x=50;
+				context.font = '12px sans-serif';
+				context.fillText(seq.queryid,x-50,y);
+				context.fillText(seq.subjectid,x-50,y+15);
+			}
+		}
+	}
 	$(document).ready(function(){
-  		$('#listtable').dataTable();
+		$('#listtable').dataTable();
+"""
+
+	scriptsPart2 = """ 		
 	});
 	</script>
+"""
+	style = """
 	<style>
 	table{
-			    font-family: "Lucida Sans Unicode", "Lucida Grande", Sans-Serif;
-			    font-size: 11px;
-			    #margin: 45px;
-			    width:100%;
-			    text-align: left;
-			    border-collapse: collapse;  
+	    font-family: "Lucida Sans Unicode", "Lucida Grande", Sans-Serif;
+	    font-size: 11px;
+	    #margin: 45px;
+	    width:100%;
+	    text-align: left;
+	    border-collapse: collapse;  
 		}
 	div.head {
+		width:800px;
 		font-family: Sans-Serif;
 		font-size: 14px;
-		border:3px solid #CCEEFF;
+		border:3px solid #EEEEEE;
 		border-radius: 10px;
 		padding: 10px;
 	    align :center;
@@ -330,30 +389,24 @@ def htmlout(table,argument,pdb):
 	</style>
 	<body>
 """
+
 	imgtag = """
 		<div class="head">
 			<a name="{6}"></a>
 			<img src="./{0}">
 			<p><a href="http://www.rcsb.org/pdb/explore/explore.do?structureId={1}">{1}:{2}</a></p>
 			<p>RMSD: {3} Angstrom, Q Score: {4}, Aligned: {5}</p>
+			<canvas id="{7}" width="800" height="{8}"></canvas>
 		</div>
 """
 	alignheader = """
 	<p><a href="http://www.rcsb.org/pdb/explore/explore.do?structureId={0}">{0}:{1}</a></p>
 """
-
 	tableHeader = """
 		<table id="listtable">
 		<thead>
 		<tr>
-			<td>PDB Reference id </td>
-			<td>Reference </td>
-			<td>PDB Query id </td>
-			<td>Query </td>
-			<td>RMSD (A) </td>
-			<td>Q Score (0-1) </td>
-			<td>Aligned AA (#) </td>
-		</tr>
+			<td>PDB Reference id </td> <td>Reference </td> <td>PDB Query id </td> <td>Query </td> <td>RMSD (A) </td> <td>Q Score (0-1) </td> <td>Aligned AA (#) </td> </tr>
 		</thead>
 		<tbody>
 """
@@ -368,25 +421,62 @@ def htmlout(table,argument,pdb):
 			<td> {6} </td>
 		</tr>
 """
-
 	htmlfooter = """
 	</body>
 </html>
 """
 	filename = pdb[:len(pdb)-4]+'.html'
+	scriptname = pdb[:len(pdb)-4]+'.js'
 	htmloutput = open(filename,'w')
-	htmloutput.write(htmlheader)
+	htmloutput.write(htmlheader.format(scriptname))
+	
 	[header,chains] = PDBParse(pdb,None,None)
 	queryTitle = extractHeader(header,'^TITLE    [ \d](.*)$',True)
 	queryPDBId = extractHeader(header,'^DBREF  (\S{4}) ',False)
 	htmloutput.write(alignheader.format(queryPDBId,queryTitle))
 	descTable = tableHeader
+	scriptdataList= []
+	jsonformatter = "var {0} = {1};\n"
+	
+
+	canvasinit = "\t\t\tvar {0} = document.getElementById('{1}');\n"
+	draw = "\t\t\tdraw({0},{1});\n"
+
+	drawList = []
+
 	for alignpdb,align in table.items():
+	
+		scriptdataList.append(jsonformatter.format("data_"+alignpdb[:len(alignpdb)-4],
+													align.JSONoutput())) 
+	
+		drawList.append(canvasinit.format("canvas"+alignpdb[:len(alignpdb)-4],
+													"canvas_"+alignpdb[:len(alignpdb)-4]))
+	
+		drawList.append(draw.format("canvas"+alignpdb[:len(alignpdb)-4],
+									"data_"+alignpdb[:len(alignpdb)-4] ))
+	
+	scriptoutput = open(scriptname,'w')
+	htmloutput.write(scriptsPart1)
+	htmloutput.writelines(drawList)
+	htmloutput.write(scriptsPart2)
+	htmloutput.write(style)
+	scriptoutput.writelines(scriptdataList)
+	scriptoutput.close()
+
+	for alignpdb,align in table.items():
+
 		[header,chains] = PDBParse(align.superposedPDB,None,None)
 		title = extractHeader(header,'^TITLE    [ \d](.*)$',True)
 		pdbid = extractHeader(header,'^DBREF  (\S{4}) ',False)
-		htmloutput.write(imgtag.format(alignpdb[:len(alignpdb)-4]+".png",pdbid,title,align.rmsd,align.qscore,align.aligned,alignpdb))
-		descTable = descTable+tableContent.format(queryPDBId, queryTitle,pdbid,title,align.rmsd,align.qscore,align.aligned,alignpdb)
+		canvasHeight = int(100+ (len(align.querySeq) / 40 + 1 ) * 70) 
+		htmloutput.write(imgtag.format(alignpdb[:len(alignpdb)-4]+".png",pdbid,
+										title,align.rmsd,align.qscore,align.aligned,
+										alignpdb,"canvas_"+alignpdb[:len(alignpdb)-4],
+										canvasHeight))
+		
+		descTable = descTable+tableContent.format(queryPDBId,queryTitle,pdbid,title,
+												align.rmsd,align.qscore,
+												align.aligned,alignpdb)
 	
 	htmloutput.write(descTable+"</tbody></table>\n")	
 	htmloutput.write(htmlfooter)
@@ -397,6 +487,7 @@ def pymolRendering(table,argument,pdb):
 	PyMOLPath = '/Applications/MacPyMOL.app/Contents/MacOS/MacPyMol'
 	pmlFile = pdb[:len(pdb)-4]+".pml"
 	pymolFile = open(pmlFile,"w")
+
 	if argument.view:
 		if os.path.exists(argument.view):
 			f = open(argument.view)
@@ -449,7 +540,6 @@ def pymolRendering(table,argument,pdb):
 	if argument.stepwise:
 		htmlout(table,argument,pdb)
 
-
 def main(argument):
 
 	pdbList=argument.files
@@ -470,7 +560,6 @@ def main(argument):
 						if (onePdb != pdb) :
 							print "Processing {0}".format(onePdb)
 							superposedFilename = pdb[:len(pdb)-4]+'_'+onePdb
-
 							sup = Superpose(queryPDB=onePdb, subjectPDB=pdb, 
 											superposedPDB=superposedFilename)
 							if sup.run():
@@ -486,20 +575,6 @@ def main(argument):
 										f = open(superposedFilename[:len(superposedFilename)-4]+".fasta","w")
 										f.writelines(aligned)
 										f.close()
-										# distance = sup.distanceOutput()
-										# if distance:
-										# 	f = open(superposedFilename[:len(superposedFilename)-4]+".distance","w")
-										# 	f.write(distance)
-										# 	f.close()
-										# if len(sup.querySecondary)>0:
-										# 	f = open(superposedFilename[:len(superposedFilename)-4]+".sec","w")
-										# 	f.write(sup.querySecondary+"\n")
-										# 	f.write(sup.subjectSecondary+"\n")
-										# 	f.close()
-										f = open(superposedFilename[:len(superposedFilename)-4]+".json","w")
-										f.write(sup.JSONoutput())
-										f.close()
-
 								
 					pymolRendering(table,argument,pdb)
 				else:
