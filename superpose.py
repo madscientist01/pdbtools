@@ -279,7 +279,9 @@ subjectsecondary:"{6}"
 					queryDistance = line[19:23].strip()
 					if line[32:33]=="|":
 						a = 5
-					else:
+					elif line[37:38]=="|":
+						a = 10
+					else: 
 						a = 0
 					subjectSecondary = line[28+a:29+a].strip()
 					subjectChain=line[31+a:32+a].strip()
@@ -339,7 +341,20 @@ def htmlout(table,argument,pdb):
 	<!-- DataTables -->
 	<script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
 	<script>
-		function draw(canvas,seq) {
+	function secColor(secondary) {
+			var col;
+			switch (secondary) {
+				case 'H' : col='red';
+						   break;
+				case 'S' : col='green';
+						   break;
+				default  : col='black';
+			}
+			return col;
+
+		}
+
+	function draw(canvas,seq) {
 		
 		var context=canvas.getContext("2d");
 		var x = 50;
@@ -373,11 +388,15 @@ def htmlout(table,argument,pdb):
 				context.fillRect(x-3,y-11,15,12);
 				context.fillRect(x-3,y+4,15,12);
 			}
-			context.fillStyle='black';
+			
+			context.fillStyle=secColor(seq.querysecondary.substring(i,i+1))
 			context.fillText(seq.querysecondary.substring(i,i+1), x, y-15);
+			context.fillStyle=secColor(seq.subjectsecondary.substring(i,i+1))
+			context.fillText(seq.subjectsecondary.substring(i,i+1), x, y+30);
+			context.fillStyle='black';
 			context.fillText(seq.query.substring(i,i+1), x, y);
 			context.fillText(seq.subject.substring(i,i+1),x,y+15);
-			context.fillText(seq.subjectsecondary.substring(i,i+1), x, y+30);
+			
 	
 			x=x+15;
 			col++;
@@ -391,6 +410,7 @@ def htmlout(table,argument,pdb):
 			}
 		}
 	}
+		
 	$(document).ready(function(){
 		$('#listtable').dataTable();
 """
@@ -501,7 +521,8 @@ def htmlout(table,argument,pdb):
 		[header,chains] = PDBParse(align.superposedPDB,None,None)
 		title = extractHeader(header,'^TITLE    [ \d](.*)$',True)
 		pdbid = extractHeader(header,'^DBREF  (\S{4}) ',False)
-		canvasHeight = int(100+ (len(align.querySeq) / 40 + 1 ) * 70) 
+		canvasHeight = int(100+ (len(align.querySeq) / 40 + 1 ) * 70)
+		
 		htmloutput.write(imgtag.format(alignpdb[:len(alignpdb)-4]+".png",pdbid,
 										title,align.rmsd,align.qscore,align.aligned,
 										alignpdb,"canvas_"+alignpdb[:len(alignpdb)-4],
@@ -510,7 +531,7 @@ def htmlout(table,argument,pdb):
 		descTable = descTable+tableContent.format(queryPDBId,queryTitle,pdbid,title,
 												align.rmsd,align.qscore,
 												align.aligned,alignpdb)
-	
+
 	htmloutput.write(descTable+"</tbody></table>\n")	
 	htmloutput.write(htmlfooter)
 	htmloutput.close()
@@ -535,30 +556,17 @@ def pymolRendering(table,argument,pdb):
 	pymolFile.write("hide all\n")
 	
 	for superposed,align in table.items():
-		write = True
-		if (argument.score and (align.qscore>=float(argument.score))):
-			print "{0} is skipped. Q Score:{1}".format(align.queryPDB, align.qscore)
-			write = False	
-
-		if (argument.rmsd and (align.rmsd>=float(argument.rmsd))):
-			print "{0} is skipped. Q Score:{1}".format(align.queryPDB, align.rmsd)
-			write = False
 		
-		if (argument.align and (align.aligned>=float(argument.align))):
-			print "{0} is skipped. Q Score:{1}".format(align.queryPDB, align.aligned)
-			write = False
-
-		if write:
-
 			if argument.stepwise:
 				pymolFile.write("load {0}/{1}\n".format(os.getcwd(),align.subjectPDB))			
 				pymolFile.write("load {0}/{1}\n".format(os.getcwd(),align.superposedPDB))
-				pymolFile.write("hide all\n")			
+				pymolFile.write("hide all\n")
 				pymolFile.write("show cartoon, {0}\n".format(align.superposedPDB[:-4]))
 				pymolFile.write("show cartoon, {0}\n".format(align.subjectPDB[:-4]))
-				pymolFile.write("util.cbc {0}\n".format(align.subjectPDB:[:-4]))
+				pymolFile.write("util.cbc {0}\n".format(align.subjectPDB[:-4]))
 				if not argument.view:
 					pymolFile.write("orient {0}\n".format(pdb[:-4]))
+				pymolFile.write("ray\n".format(align.superposedPDB[:-4]))	
 				pymolFile.write("png {0}.png\n".format(align.superposedPDB[:-4]))
 			else:
 				pymolFile.write("load {0}/{1}\n".format(os.getcwd(),align.superposedPDB))
@@ -603,14 +611,29 @@ def main(argument):
 									subjectFilename = sup.extractSubjectPDB()
 									sup.subjectPDB = subjectFilename
 								
-								table[superposedFilename]=sup
-								pdbLoadList.append(superposedFilename)
-								if argument.stalign:
-									aligned = sup.FASTAoutput()
-									if aligned:
-										f = open(superposedFilename[:len(superposedFilename)-4]+".fasta","w")
-										f.writelines(aligned)
-										f.close()
+								write = True
+								if (argument.score and (sup.qscore>=float(argument.score))):
+									print "{0} is skipped. Q Score:{1}".format(sup.queryPDB, sup.qscore)
+									write = False	
+
+								if (argument.rmsd and (sup.rmsd>=float(argument.rmsd))):
+									print "{0} is skipped. RMSD:{1}".format(sup.queryPDB, sup.rmsd)
+									write = False
+								
+								if (argument.align and (sup.aligned>=float(argument.align))):
+									print "{0} is skipped. aligned:{1}".format(sup.queryPDB, sup.aligned)
+									write = False
+
+								if write:
+
+									table[superposedFilename]=sup
+									pdbLoadList.append(superposedFilename)
+									if argument.stalign:
+										aligned = sup.FASTAoutput()
+										if aligned:
+											f = open(superposedFilename[:len(superposedFilename)-4]+".fasta","w")
+											f.writelines(aligned)
+											f.close()
 								
 					pymolRendering(table,argument,pdb)
 				else:
