@@ -531,10 +531,9 @@ def pymolRendering(table,argument,pdb):
 			f.close()
 
 	pymolFile.write("bg_color white\n")
+	pymolFile.write("load {0}/{1}\n".format(os.getcwd(),pdb))	
 	pymolFile.write("hide all\n")
-	if not argument.stepwise:
-		pymolFile.write("load {0}/{1}\n".format(os.getcwd(),pdb))	
-
+	
 	for superposed,align in table.items():
 		write = True
 		if (argument.score and (align.qscore>=float(argument.score))):
@@ -557,9 +556,9 @@ def pymolRendering(table,argument,pdb):
 				pymolFile.write("hide all\n")			
 				pymolFile.write("show cartoon, {0}\n".format(align.superposedPDB[:-4]))
 				pymolFile.write("show cartoon, {0}\n".format(align.subjectPDB[:-4]))
-
+				pymolFile.write("util.cbc {0}\n".format(align.subjectPDB:[:-4]))
 				if not argument.view:
-					pymolFile.write("orient {0}\n".format(align.subjectPDB[:-4]))
+					pymolFile.write("orient {0}\n".format(pdb[:-4]))
 				pymolFile.write("png {0}.png\n".format(align.superposedPDB[:-4]))
 			else:
 				pymolFile.write("load {0}/{1}\n".format(os.getcwd(),align.superposedPDB))
