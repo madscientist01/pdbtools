@@ -66,9 +66,20 @@ class Superpose():
 		return(buffer)	
 
 	def JSONoutput(self):
-		queryHeader= self.queryPDB[:len(self.queryPDB)-4]
+
+		[header,chains] = PDBParse(self.queryPDB,None,None)
+		querypdbid = extractHeader(header,'^DBREF  (\S{4}) ',False)
+		if querypdbid:
+			queryHeader = querypdbid
+		else:
+			queryHeader= self.queryPDB[:len(self.queryPDB)-4]
+		[header,chains] = PDBParse(self.subjectPDB,None,None)
+		subjectpdbid = extractHeader(header,'^DBREF  (\S{4}) ',False)
+		if subjectpdbid:
+			subjectHeader = subjectpdbid
+		else:
+			subjectHeader=	self.subjectPDB[:len(self.subjectPDB)-4]
 		querySeq = self.querySeq
-		subjectHeader=	self.subjectPDB[:len(self.subjectPDB)-4]
 		subjectSeq = self.subjectSeq
 		querySecondary = self.querySecondary
 		subjectSecondary = self.subjectSecondary
@@ -110,6 +121,7 @@ subjectsecondary:"{6}"
 		return(fasta)
 
 	def distanceOutput(self):
+
 		distance = ",".join(self.alignedDistance)
 		return(distance)	
 
@@ -173,7 +185,28 @@ subjectsecondary:"{6}"
 		self.subjectSecondary = sSecondary
 		return 
 
-	def extractSuperposedPDB(self,filename):
+	def extractSubjectPDB(self):
+
+		if os.path.exists(self.subjectPDB) and len(self.subjectAlign)>0:
+			startchain = self.subjectAlign[self.upper].chain;
+			start = self.subjectAlign[self.upper].number;
+			endchain = self.subjectAlign[self.lower].chain;
+			end = self.subjectAlign[self.lower].number;
+			[header,chains] = PDBParse(self.subjectPDB,None,None)
+
+			if startchain ==endchain:
+				extractRegion = "{0}:{1}_{2}".format(startchain,start,end)
+			else:
+				extractRegion = "{0}:{1}_{2} {3}:{4}_{5}".format(startchain,start,9999,endchain,1,end)
+			pdbExtract = PDBExtract(extractregion = extractRegion, header=True)
+			newFileName=pdbExtract.extractRegions(header,chains,self.subjectPDB)
+			return(newFileName)
+		else:
+			print "problem"
+			return(filename)
+
+
+	def extractSuperposedPDB(self):
 
 		if os.path.exists(self.superposedPDB) and len(self.queryAlign)>0:
 			startchain = self.queryAlign[self.upper].chain;
@@ -183,11 +216,11 @@ subjectsecondary:"{6}"
 			[header,chains] = PDBParse(self.superposedPDB,None,None)
 
 			if startchain ==endchain:
-				extractRegion = "{0}:{1}-{2}".format(startchain,start,end)
+				extractRegion = "{0}:{1}_{2}".format(startchain,start,end)
 			else:
-				extractRegion = "{0}:{1}-{2} {3}:{4}-{5}".format(startchain,start,9999,endchain,1,end)
+				extractRegion = "{0}:{1}_{2} {3}:{4}_{5}".format(startchain,start,9999,endchain,1,end)
 			pdbExtract = PDBExtract(extractregion = extractRegion, header=True)
-			newFileName=pdbExtract.extractRegions(header,chains,filename)
+			newFileName=pdbExtract.extractRegions(header,chains,self.superposedPDB)
 			return(newFileName)
 		else:
 			print "problem"
@@ -499,7 +532,8 @@ def pymolRendering(table,argument,pdb):
 
 	pymolFile.write("bg_color white\n")
 	pymolFile.write("hide all\n")
-	pymolFile.write("load {0}/{1}\n".format(os.getcwd(),pdb))
+	if not argument.stepwise:
+		pymolFile.write("load {0}/{1}\n".format(os.getcwd(),pdb))	
 
 	for superposed,align in table.items():
 		write = True
@@ -517,14 +551,15 @@ def pymolRendering(table,argument,pdb):
 
 		if write:
 
-			if argument.stepwise:			
+			if argument.stepwise:
+				pymolFile.write("load {0}/{1}\n".format(os.getcwd(),align.subjectPDB))			
 				pymolFile.write("load {0}/{1}\n".format(os.getcwd(),align.superposedPDB))
 				pymolFile.write("hide all\n")			
 				pymolFile.write("show cartoon, {0}\n".format(align.superposedPDB[:-4]))
-				pymolFile.write("show cartoon, {0}\n".format(pdb[:-4]))
+				pymolFile.write("show cartoon, {0}\n".format(align.subjectPDB[:-4]))
 
 				if not argument.view:
-					pymolFile.write("orient {0}\n".format(pdb[:-4]))
+					pymolFile.write("orient {0}\n".format(align.subjectPDB[:-4]))
 				pymolFile.write("png {0}.png\n".format(align.superposedPDB[:-4]))
 			else:
 				pymolFile.write("load {0}/{1}\n".format(os.getcwd(),align.superposedPDB))
@@ -564,8 +599,10 @@ def main(argument):
 											superposedPDB=superposedFilename)
 							if sup.run():
 								if argument.extract:
-									superposedFilename = sup.extractSuperposedPDB(superposedFilename)
+									superposedFilename = sup.extractSuperposedPDB()
 									sup.superposedPDB = superposedFilename
+									subjectFilename = sup.extractSubjectPDB()
+									sup.subjectPDB = subjectFilename
 								
 								table[superposedFilename]=sup
 								pdbLoadList.append(superposedFilename)

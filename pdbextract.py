@@ -81,7 +81,7 @@ def filterATOM(chains,extractRegion):
 
 	for chain in extractRegion:
 		if chain in chains:
-			s,e = extractRegion[chain].split("-")
+			s,e = extractRegion[chain].split("_")
 			start=int(s)
 			end = int(e)
 			# print start,end
@@ -233,7 +233,7 @@ class PDBExtract(object):
 		regionDictionary={}
 		regions = self.extractregion.split()
 		includedChain = ""
-		extractRegex = re.compile("(\S):(\d+)-(\d+)")
+		extractRegex = re.compile("(\S):(\d+)_(\d+)")
 		for region in regions:
 			match = extractRegex.match(region)
 			if match:
@@ -242,13 +242,13 @@ class PDBExtract(object):
 				if end<start:
 					start = match.group(3)
 					end = match.group(2)
-				regionDictionary[match.group(1)]="{0}-{1}".format(start,end)
+				regionDictionary[match.group(1)]="{0}_{1}".format(start,end)
 				includedChain=includedChain+match.group(1)
 		buffer = filterATOM(chain,regionDictionary)
 
 		if len(buffer)>0:
 
-			newFileName = self.newFileName(filename,"".join(regionDictionary))
+			newFileName = self.newFileName(filename,"".join(regionDictionary.values()))
 			f = open(newFileName,'w')
 			if self.header:
 				filteredHeader = filterHeader(header,includedChain.split())
