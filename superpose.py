@@ -252,7 +252,7 @@ subjectsecondary:"{6}"
 			if match:
 				self.rmsd= float(match.group(1))
 				self.qscore=float(match.group(2))
-				self.aligned=aligned=float(match.group(3))
+				self.aligned=float(match.group(3))
 				success=True
 			else:
 				success=False
@@ -288,19 +288,15 @@ subjectsecondary:"{6}"
 					subjectAmino=line[33+a:36+a].strip()
 					subjectAminoNum=line[36+a:40+a].strip()
 					
-					query = False
-					subject = False
 					if len(querySecondary)+len(queryChain)+len(queryAmino)+len(queryAminoNum)>0:
 						queryresidue = Aligned(pdb=self.queryPDB, chain=queryChain, aa=queryAmino,
 											   number=int(queryAminoNum),gap=False,secondary=querySecondary)
-						query = True
 					else:
 						queryresidue = Aligned(pdb=self.queryPDB,aa="-",gap=True)
 
 					if len(subjectSecondary)+len(subjectChain)+len(subjectAmino)+len(subjectAminoNum)>0:
 						subjectresidue = Aligned(pdb=self.subjectPDB, chain=subjectChain, 
 												 aa=subjectAmino,number=int(subjectAminoNum),gap=False,secondary=subjectSecondary)
-						subject = True
 					else:
 						subjectresidue = Aligned(pdb=self.subjectPDB,aa="-", gap=True)
 					
@@ -597,9 +593,6 @@ def main(argument):
 
 				subjectList = glob.glob('*.pdb')
 				pdbLoadList = []
-				RMSDDic = {}
-				QDic = {}
-				alignedDic = {}
 	
 				if len(subjectList)>0:
 					table = {}
