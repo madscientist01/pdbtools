@@ -355,7 +355,9 @@ def htmlout(table,argument,pdb):
 		}
 
 	function draw(canvas,seq) {
-		
+		//
+		// Draw structural alignment in Canvas
+		//
 		var context=canvas.getContext("2d");
 		var x = 50;
 		var y = 100;
@@ -537,7 +539,10 @@ def htmlout(table,argument,pdb):
 	htmloutput.close()
 
 def pymolRendering(table,argument,pdb):
-
+	#
+	# Pymol Rendering of Stepwise comparison
+	#
+	#
 	PyMOLPath = '/Applications/MacPyMOL.app/Contents/MacOS/MacPyMol'
 	pmlFile = pdb[:len(pdb)-4]+".pml"
 	pymolFile = open(pmlFile,"w")
