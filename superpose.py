@@ -84,6 +84,8 @@ class Superpose():
 		querySecondary = self.querySecondary
 		subjectSecondary = self.subjectSecondary
 		distance = self.distanceOutput()
+		queryStart = self.queryAlign[self.upper].number
+		subjectStart = self.subjectAlign[self.upper].number
 		jsons = """
 queryid:"{0}",
 query:"{1}", 
@@ -91,9 +93,11 @@ subjectid:"{2}",
 subject:"{3}",
 distance:[{4}],
 querysecondary:"{5}",
-subjectsecondary:"{6}"
+subjectsecondary:"{6}",
+querystart:{7},
+subjectstart:{8}
 		"""
-		output = "{"+jsons.format(queryHeader,querySeq,subjectHeader,subjectSeq,distance,querySecondary,subjectSecondary)+"}"
+		output = "{"+jsons.format(queryHeader,querySeq,subjectHeader,subjectSeq,distance,querySecondary,subjectSecondary,queryStart,subjectStart)+"}"
 		return (output)
 
 
@@ -337,7 +341,7 @@ def htmlout(table,argument,pdb):
 	<!-- DataTables -->
 	<script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
 	<script>
-	function secColor(secondary) {
+		function secColor(secondary) {
 			var col;
 			switch (secondary) {
 				case 'H' : col='red';
@@ -355,16 +359,24 @@ def htmlout(table,argument,pdb):
 		// Draw structural alignment in Canvas
 		//
 		var context=canvas.getContext("2d");
-		var x = 50;
+		var x = 100;
 		var y = 100;
 		var length = seq.query.length;
 		context.font = '12px sans-serif';
 		var column = 40;
 		var col = 0;
-		context.fillText(seq.queryid,x-50,y);
-		context.fillText(seq.subjectid,x-50,y+15);
+		var queryStart = seq.querystart;
+		var subjectStart = seq.subjectstart;
 		
-		var lx=50
+		
+		context.textAlign = 'right'
+		context.fillText(queryStart,x-10,y);
+		context.fillText(subjectStart,x-10,y+15);
+		context.textAlign = 'left'
+		context.fillText(seq.queryid,x-80,y);
+		context.fillText(seq.subjectid,x-80,y+15);		
+
+		var lx=100
 		var ly=50
 		context.fillStyle = 'black';
 		context.fillText('Distance (Angstrom)',lx,ly-15);
@@ -372,12 +384,11 @@ def htmlout(table,argument,pdb):
 		for (var j=0;j<=3.0;j=j+0.5) {
 			var color='rgb('+parseInt(85*j)+','+parseInt(85*j)+',255)';
 			context.fillStyle = color;
-			context.fillRect(lx+j*50-5,ly-12,22,15);
+			context.fillRect(lx+j*50-3,ly-12,22,15);
 			context.fillStyle = 'black';
-			context.fillText(j.toFixed(1),lx+j*50,ly);
-			
+			context.fillText(j.toFixed(1),lx+j*50,ly);			
 		}
-		context.textAlign = 'left'
+		
 		for (var i=0;i<length;i++) {
 			context.font = '12px sans-serif';
 			if (seq.distance[i]<3.0) {
@@ -393,18 +404,27 @@ def htmlout(table,argument,pdb):
 			context.fillText(seq.subjectsecondary.substring(i,i+1), x, y+30);
 			context.fillStyle='black';
 			context.fillText(seq.query.substring(i,i+1), x, y);
+			if (seq.query.substring(i,i+1)!="-") {
+				queryStart++;
+			}
 			context.fillText(seq.subject.substring(i,i+1),x,y+15);
-			
+			if (seq.subject.substring(i,i+1)!="-") {
+				subjectStart++;
+			}
 	
 			x=x+15;
 			col++;
-			if (col>column) {
+			if (col>=column) {
 				y=y+70;
 				col=0;
-				x=50;
+				x=100;
 				context.font = '12px sans-serif';
-				context.fillText(seq.queryid,x-50,y);
-				context.fillText(seq.subjectid,x-50,y+15);
+				context.fillText(seq.queryid,x-80,y);
+				context.fillText(seq.subjectid,x-80,y+15);
+				context.textAlign = 'right'
+				context.fillText(queryStart,x-10,y);
+				context.fillText(subjectStart,x-10,y+15);
+				context.textAlign = 'left'
 			}
 		}
 	}
@@ -659,6 +679,6 @@ if __name__ == "__main__":
 						help='Save structure based sequence alignment')
 	parser.add_argument('-v', '--fixed_view', action='store', dest='view',
 						help='Filename which contains set_view command of PyMOL')
-
+	
 	results = parser.parse_args()
 	main(results)
