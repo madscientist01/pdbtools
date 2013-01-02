@@ -1,6 +1,6 @@
-#PDBTOOLS
+#pdbtools
 
-General Purpose PDB manipulation utilities
+General Purpose Protein Data Bank (PDB) file manipulation utilities
 Written and maintained by Suk Namgoong (suk.namgoong@gmail.com)
 
 ### Requirements
