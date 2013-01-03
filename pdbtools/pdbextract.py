@@ -9,10 +9,14 @@
 # Require Python 2.6 or recent and BioPython
 #
 
-import sys, subprocess, re, os, glob, argparse
+import sys
+import re
+import os
+import glob
+import argparse
 from shutil import copy
-from Bio import pairwise2
-from Bio.SubsMat import MatrixInfo as matlist
+import pairwise2
+import MatrixInfo as matlist
 
 def readFasta(filename) :
 	#
