@@ -1,14 +1,38 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-
+# fetchPDB
+# Script and Class for the easy pdb fetch from RCSB PDB
+#
+#
+# The MIT License
+#
+# Copyright (c) 2012 Suk Namgoong (suk.namgoong@gmail.com)
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 import urllib2
 import os
 import argparse
 
-class PDBFetch(object):
+class fetchPDB(object):
 
     '''
-    
+    PDB Fetch utility and class
     '''
     def __init__(self, **kwargs):
         self.pdblist = kwargs.get('pdblist')
@@ -48,7 +72,6 @@ class PDBFetch(object):
             except urllib2.URLError:
                 print '{0} : Error in pdb code. Skipped.'.format(pdb)
 
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -80,6 +103,6 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--path', dest='path', default='',
                         help='generate subdirectory')
     results = parser.parse_args()
-    fetch = PDBFetch(pdblist=results.list, biologicalUnit=results.biologicalUnit, verbose=results.verbose, path=results.path)
+    fetch = fetchPDB(pdblist=results.list, biologicalUnit=results.biologicalUnit, verbose=results.verbose, path=results.path)
     fetch.download()
 
