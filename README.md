@@ -1,6 +1,6 @@
 #pdbtools
 
-General Purpose Protein Data Bank (PDB) file manipulation utilities
+General Purpose Protein Data Bank (PDB) file manipulation utilities and library
 Written and maintained by Suk Namgoong (suk.namgoong@gmail.com)
 
 ### Requirements
@@ -15,4 +15,13 @@ Written and maintained by Suk Namgoong (suk.namgoong@gmail.com)
 * render.py : Batch rendering of multiple by PyMOL
 * pdbquery.py : Using PDB RESTful web service, query PDB using multiple conditions and download them
 * pdbblast.py : fetch pdb using BLAST search
+# fetchPDB.py : fetch pdb by PDB accession codes
+
+### Install
+
+* download
+
+    python setup.py install
+
+### Usage
 
