@@ -3,23 +3,30 @@
 
 import urllib2
 import os
+import shutil
 import argparse
+import subprocess
 
 class PDBFetch(object):
 
 
     def __init__(self, **kwargs):
         self.pdblist = kwargs.get('pdblist')
-        self.biologicalUnit = kwargs.get('biologicalUnit', True)
+        self.biologicalUnit = kwargs.get('biologicalUnit', False)
         self.verbose = kwargs.get('verbose', True)
         self.path = kwargs.get('path','')
+        self.overwrite = kwargs.get('overwrite',False)
         if len(self.path) > 0 and not os.path.isdir(self.path):
             os.mkdir(self.path)
+        if len(self.path)>0 and os.path.isdir(self.path) and self.overwrite:
+            shutil.rmtree(self.path)
+            os.mkdir(self.path)
+
         if len(self.path) > 0 and self.path[len(self.path) - 1] != '/':
             self.path = self.path + '/'
 
     def download(self):
-
+        downloadList = []
         if self.biologicalUnit:
             pdburl = \
                 'ftp://ftp.wwpdb.org/pub/pdb/data/biounit/coordinates/all/{0}.pdb.gz'
@@ -38,11 +45,17 @@ class PDBFetch(object):
             if self.verbose:
                 print 'download {0}'.format(pdb)
             try:
-                f = urllib2.urlopen(pdburl.format(pdb.lower()))
-                data = f.read()
-                with open(filename + '.gz', 'wb') as code:
-                    code.write(data)
-                os.system('gunzip {0}.gz'.format(filename))
+                f = urllib2.urlopen(pdburl.format(pdb))
+                downloadData = f.read()
+                with open(self.path+filename + '.gz', 'wb') as code:
+                    code.write(downloadData)
+                    downloadList.append(filename)
+                p = subprocess.Popen([
+                    'gunzip',
+                    '-f',
+                    '{0}.gz'.format(self.path+filename)
+                    ], stdout=subprocess.PIPE)   
+                p_stdout = p.stdout.read()         
             except urllib2.URLError:
                 print '{0} : Error in pdb code. Skipped.'.format(pdb)
 

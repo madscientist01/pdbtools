@@ -35,7 +35,8 @@ def readFasta(filename) :
 			if match:
 				sequenceName = match.group(1)
 			else:
-				sequence = sequence+line			
+				sequence = sequence+line
+		f.close()			
 		return(sequenceName,sequence)	    	
 	else:
 		return()
@@ -226,6 +227,7 @@ class PDBExtract(object):
 			f=open(newFileName, 'w')
 			f.writelines(filterHeader(header,includedChain.split()))
 			f.writelines(buffer)
+			f.close()
 		else:
 			newFileName=''
 
