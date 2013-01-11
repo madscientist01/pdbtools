@@ -45,6 +45,7 @@ class PDBFetch(object):
             if self.verbose:
                 print 'download {0}'.format(pdb)
             try:
+                print pdburl.format(pdb)
                 f = urllib2.urlopen(pdburl.format(pdb))
                 downloadData = f.read()
                 with open(self.path+filename + '.gz', 'wb') as code:
