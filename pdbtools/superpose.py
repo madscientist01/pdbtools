@@ -259,7 +259,7 @@ subjectstart:{8}
                     end,
                     )
             pdbExtract = PDBExtract(extractregion=extractRegion,
-                                    header=True)
+                                    header=True,overwrite=True)
             newFileName = pdbExtract.extractRegions(header, chains,
                     self.subjectPDB)
             return newFileName
