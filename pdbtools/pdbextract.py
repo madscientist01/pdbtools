@@ -603,14 +603,14 @@ class PDBExtract(object):
                                          gapOpen, gapExtend)
         (query, subject, score, begin, stop) = aln[0]
         i=0
-        while i < (len(subject)):
-            if subject[i]!="-":
+        while i < (len(query)):
+            if query[i]!="-" and subject[i]!="-":
                 break
             i+=1
         start=i
-        i=len(subject)-1
+        i=len(query)-1
         while i>0:
-            if subject[i]!="-":
+            if query[i]!="-" and subject[i]!="-":
                 break
             i-=1
         end = i
@@ -622,10 +622,6 @@ class PDBExtract(object):
 
         regionDictionary = {}
         
-        # print sequence
-        # print query
-        # print subject
-        # print adjustedStart, adjustedEnd, len(resnum)
         regionDictionary[selectedchain] = '{0}_{1}'.format(resnum[adjustedStart], resnum[adjustedEnd])
         includedChain = selectedchain
         buffer = filterATOM(chains, regionDictionary)
