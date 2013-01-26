@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+
+
+<html>
+    <head>
+        <title>{{results.file}}</title>
+        <meta charset='utf-8'>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <script type="text/javascript" charset="utf8" src="{0}"></script>
+
+        <!-- DataTables CSS -->
+        <link rel="stylesheet" type="text/css" href="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/css/jquery.dataTables.css">
+        <!-- BootStrap CSS -->
+        <link href="http://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.2/css/bootstrap-combined.min.css" rel="stylesheet">
+        <!-- jQuery -->
+        <script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.8.2.min.js"></script>
+        
+        <script src="httP://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.2/js/bootstrap.min.js"></script>
+        <!-- DataTables -->
+        <script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+
+        <script>
+        function secColor(secondary) {
+            var col;
+            switch (secondary) {
+                case 'H' : col='red';
+                           break;
+                case 'S' : col='green';
+                           break;
+                default  : col='black';
+            }
+            return col;
+
+        }
+
+        function draw(canvas,seq) {
+            //
+            // Draw structural alignment in Canvas
+            //
+            var context=canvas.getContext("2d");
+            var x = 100;
+            var y = 100;
+            var length = seq.query.length;
+            context.font = '12px sans-serif';
+            var column = 40;
+            var col = 0;
+            var queryStart = seq.querystart;
+            var subjectStart = seq.subjectstart;
+            
+            
+            context.textAlign = 'right'
+            context.fillText(queryStart,x-10,y);
+            context.fillText(subjectStart,x-10,y+15);
+            context.textAlign = 'left'
+            context.fillText(seq.queryid,x-80,y);
+            context.fillText(seq.subjectid,x-80,y+15);      
+
+            var lx=100
+            var ly=50
+            context.fillStyle = 'black';
+            context.fillText('Distance (Angstrom)',lx,ly-15);
+            
+            for (var j=0;j<=3.0;j=j+0.5) {
+                var color='rgb('+parseInt(85*j)+','+parseInt(85*j)+',255)';
+                context.fillStyle = color;
+                context.fillRect(lx+j*50-3,ly-12,22,15);
+                context.fillStyle = 'black';
+                context.fillText(j.toFixed(1),lx+j*50,ly);          
+            }
+            
+            for (var i=0;i<length;i++) {
+                context.font = '12px sans-serif';
+                if (seq.distance[i]<3.0) {
+                    var color='rgb('+parseInt(85*seq.distance[i])+','+parseInt(85*seq.distance[i])+',255)';
+                    context.fillStyle = color;
+                    context.fillRect(x-3,y-11,15,12);
+                    context.fillRect(x-3,y+4,15,12);
+                }
+                
+                context.fillStyle=secColor(seq.querysecondary.substring(i,i+1))
+                context.fillText(seq.querysecondary.substring(i,i+1), x, y-15);
+                context.fillStyle=secColor(seq.subjectsecondary.substring(i,i+1))
+                context.fillText(seq.subjectsecondary.substring(i,i+1), x, y+30);
+                context.fillStyle='black';
+                context.fillText(seq.query.substring(i,i+1), x, y);
+                if (seq.query.substring(i,i+1)!="-") {
+                    queryStart++;
+                }
+                context.fillText(seq.subject.substring(i,i+1),x,y+15);
+                if (seq.subject.substring(i,i+1)!="-") {
+                    subjectStart++;
+                }
+        
+                x=x+15;
+                col++;
+                if (col>=column) {
+                    y=y+70;
+                    col=0;
+                    x=100;
+                    context.font = '12px sans-serif';
+                    context.fillText(seq.queryid,x-80,y);
+                    context.fillText(seq.subjectid,x-80,y+15);
+                    context.textAlign = 'right'
+                    context.fillText(queryStart,x-10,y);
+                    context.fillText(subjectStart,x-10,y+15);
+                    context.textAlign = 'left'
+                }
+            }
+        }
+
+        $(document).ready(function(){       
+           
+                $('#listtable').dataTable({
+                    "sDom": "<'row'<'span8'l>r>t<'row'<'span8'i><'span8'p>>",
+                     "iDisplayLength": 50,
+                     "aoColumnDefs": [
+                     { "sWidth": "60px", "aTargets": [ 0 ] },
+                     { "sWidth": "60px", "aTargets": [ 1 ] },                
+                     ]                                    
+                    });
+                  var oTable = $('#listtable').dataTable();
+                oTable.fnSort( [ [5,'desc'], [4,'desc'] ] );
+                $(function () {
+                    $('#myTab a:last').tab('show');
+                 })
+                 
+                {% for data in scriptdata %}
+                    var data_{{data.pdb}} = {{ data.json }};
+                    var canvas{{data.pdb}} = document.getElementById('canvas_{{data.pdb}}');
+                    draw(canvas{{data.pdb}},data_{{data.pdb}});
+                {% endfor %}       
+
+        });
+
+        $("#hitbutton").click(function() {
+            if ($('#Seq').hasClass('active'))
+                    $('#Seq').removeClass('active');
+            if ($('#Align').hasClass('active'))
+                    $('#Align').removeClass('active');         
+                $('#Hit').addClass('active');
+            return false;
+        });
+
+        $("#alignbutton").click(function() {
+            if ($('#Seq').hasClass('active'))
+                    $('#Seq').removeClass('active');
+            if ($('#Hit').hasClass('active'))
+                    $('#Hit').removeClass('active');         
+                $('#Align').addClass('active');
+            return false;
+        });
+
+        </script>
+                  
+            <style>
+            table{
+                font-family: "Arial",Sans-Serif;
+                font-size: 12px;
+                margin: 40px;
+                width:1000px;
+                text-align: left;
+                border-collapse: collapse;  
+                }
+            tr.conditionalRowColor
+            {
+
+            }
+                
+             td.conditionalRowColor
+            {
+                background-color:#FFEEEE;
+            }
+
+            .scrollable {
+            height: 100%;
+            overflow: auto;
+            }
+            div.head {
+                width:800px;
+                font-family: Sans-Serif;
+                font-size: 14px;
+                border:3px solid #EEEEEE;
+                border-radius: 10px;
+                padding: 10px;
+                align :center;
+                background-color: #FFFFFF;
+                }
+           div.dataTables_length 
+           label {
+                width: 460px;
+                float: left;
+                text-align: left;
+            }
+             
+            div.dataTables_length 
+            select {
+                width: 75px;
+            }
+             
+            div.dataTables_filter 
+            label {
+                float: right;
+                width: 460px;
+            }
+             
+            div.dataTables_info {
+                padding-top: 8px;
+            }
+             
+            div.dataTables_paginate {
+                float: right;
+                margin: 0;
+            }
+            
+            table {
+                clear: both;
+            } 
+            </style>
+        <body>
+        
+        <div class=row>
+            <div class="navbar navbar-inverse navbar-fixed-top">
+              <div class="navbar-inner">
+                <div class="container-fluid">
+                  <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                  </a>
+                  <a class="brand" href="../summary.html">Superpose</a>
+                  <div class="nav-collapse collapse">
+                    <ul class="nav" id="main-nav">
+                      <li class="active"><a href="#predictions">Summary</a></li>
+                      <li><a href="#Hit" id="hitbutton">Hit </a></li>
+                    </ul>
+                  </div><!--/.nav-collapse -->
+                </div>
+              </div>
+            </div>
+            <div class="hero-unit">
+                <a name="superpose" id ="superpose"></a>
+                <h2>Superpose search for {{name}}</h2>
+            </div>
+        </div>    
+        <div class=row>
+        <div class=span1>
+        </div>
+        <div class=span11>
+            <a name="predictions" id ="predictions"></a>
+            <table id='listtable' class='table table-bordered'>
+            <thead>
+                <tr>
+                    {% for name in headers %}
+                    <td>{{ name }}</td>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in tableData %}
+                <tr>
+                    <td>
+                        
+                    </td>
+                    <td>
+                     
+                    </td>
+                    <td>
+               
+                    </td>
+                    <td>
+                  
+                    </td>
+                    <td>
+          
+                    </td>
+                    <td>
+  
+                    </td>
+                    <td>
+
+                    </td>
+                    <td>
+
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        </div>
+
+        <div class=row>
+            <div class=span1>
+            </div>
+            <div class=span11>
+            <ul class="nav nav-tabs" id="myTab">
+                <li class="active" id="hittab"><a href="#Hit" data-toggle="tab">Hits</a></li>
+                <li id="sequencetab"><a href="#Seq" data-toggle="tab">Sequence</a></li>
+                <li id="aligntab"><a href="#Align" data-toggle="tab">Align</a></li>
+                
+            </ul>
+            </div>
+        </div>
+        <div class="tab-content">
+            <div class="tab-pane active" id ="Hit">
+                <div class=row>
+                  
+                    <div class=span1>
+                    </div>
+                    <div class=span11>
+                        {{hitmap}}
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane" id ="Seq">
+                <div class=row>
+                    <div class=span1>
+                    </div>
+                    <div class=span11>
+                        {{sequence}}
+                    </div>
+                </div>           
+            </div>
+            <div class="tab-pane" id ="Align">
+                <div>
+                {% for hit in hits %}
+                <div class=row>
+               
+                </div>
+                <div class=span3>
+                    <a name="{{hit.name}}" id="{{hit.name}}"></a>
+                    <div class="well well-small">
+                        <a href="{{hit.labelLink}}"><h3>{{hit.name}}</h3></a>
+                        <h5>{{hit.description}}</h5>
+                        <h5><em>{{hit.specie}}</em></h5>
+                        Probability
+                        {{ labeling (hit.probability, hit.color) }}
+                        E-value 
+                        {{ labeling (hit.evalue, hit.color) }}<br>
+                        Score   <span class="label">{{hit.score}}</span> Identity   <span class="label">{{hit.identity}}%</span><br>
+                        
+                    </div>
+
+                </div>
+                <div class=span2>
+                    <img src="http://www.rcsb.org/pdb/images/{{hit.name|lower}}_bio_r_500.jpg" width=150>
+                </div>
+                <div class=span7>
+                    {{hit.svg}}
+                </div>
+                {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+       
+    </body>
